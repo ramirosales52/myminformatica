@@ -89,12 +89,38 @@ beforeAll(async () => {
     })
   }
   responsible = users[0].id
-  workspace = await rpc(A, 'create_workspace', { p_name: 'QA transaccional temporal' })
-  workspaces.push(workspace)
+  // Crear solo fixtures propias: create_workspace ahora devuelve el negocio real
+  // compartido y NUNCA debe incluirse ese id en la limpieza de las pruebas.
+  const fixture = new pg.Client({ connectionString: database })
+  await fixture.connect()
+  try {
+    for (const user of [users[0], users[2]]) {
+      const id = crypto.randomUUID()
+      workspaces.push(id)
+      await fixture.query('insert into public.workspaces(id,name,created_by) values($1,$2,$3)', [
+        id,
+        'QA temporal',
+        user.id,
+      ])
+      await fixture.query(
+        "insert into public.workspace_members(workspace_id,user_id,role) values($1,$2,'admin')",
+        [id, user.id],
+      )
+      await fixture.query(
+        "insert into public.services(workspace_id,name) values($1,'Servicio QA')",
+        [id],
+      )
+      await fixture.query(
+        "insert into public.message_templates(workspace_id,title,body) values($1,'Mensaje QA','Hola')",
+        [id],
+      )
+    }
+  } finally {
+    await fixture.end()
+  }
+  workspace = workspaces[0]
   const invitation = await rpc(A, 'create_invite', { p_workspace: workspace })
   await rpc(B, 'join_workspace', { p_token: invitation })
-  const isolated = await rpc(C, 'create_workspace', { p_name: 'QA aislado temporal' })
-  workspaces.push(isolated)
   const r = await A.from('customers')
     .insert({
       workspace_id: workspace,
@@ -169,6 +195,19 @@ afterAll(async () => {
   }
 })
 describe('Supabase real: seguridad, dinero y sincronización', () => {
+  it('todas las cuentas usan un único negocio sin crear espacios ni membresías', async () => {
+    const ids = await Promise.all(
+      [A, B, C, D].map((c) => rpc(c, 'create_workspace', { p_name: 'Ignorado' })),
+    )
+    expect(new Set(ids).size).toBe(1)
+    const payments = await Promise.all(
+      [A, B, C, D].map((c) => c.from('payments').select('id').order('id')),
+    )
+    for (const result of payments) {
+      expect(result.error).toBeNull()
+      expect(result.data).toEqual(payments[0].data)
+    }
+  })
   it('A crea un turno y B recibe INSERT por Realtime', async () => {
     await changeWithRealtime(B, 'appointments', 'INSERT', async () => {
       appointment = await rpc(A, 'save_appointment', {
@@ -560,7 +599,7 @@ describe('Supabase real: seguridad, dinero y sincronización', () => {
       name: 'Servicio acordado de prueba',
     })
   })
-  it('rechaza teléfonos duplicados y referencias entre espacios', async () => {
+  it('rechaza teléfonos duplicados y permite clientes históricos de otros espacios', async () => {
     const r = await B.from('customers').insert({
       workspace_id: workspace,
       full_name: 'Duplicado',
@@ -571,14 +610,36 @@ describe('Supabase real: seguridad, dinero y sincronización', () => {
       .insert({ workspace_id: workspaces[1], full_name: 'Cliente ajeno', phone: '+5493510000002' })
       .select()
       .single()
+    const foreignService = await C.from('services')
+      .select('id')
+      .eq('workspace_id', workspaces[1])
+      .single()
     const cross = await A.rpc('save_appointment', {
       p_workspace: workspace,
-      p_payload: { ...payload, starts_at: later(8), customer_id: foreign.data!.id },
+      p_payload: {
+        ...payload,
+        starts_at: later(80),
+        customer_id: foreign.data!.id,
+        services: [
+          {
+            service_id: foreignService.data!.id,
+            name: 'Servicio histórico compartido',
+            price_cents: 2000,
+            duration_minutes: 60,
+          },
+        ],
+      },
       p_request_id: crypto.randomUUID(),
     })
-    expect(cross.error?.code).toBe('23503')
+    expect(cross.error).toBeNull()
+    const overlap = await D.rpc('save_appointment', {
+      p_workspace: workspaces[1],
+      p_payload: { ...payload, starts_at: later(80) },
+      p_request_id: crypto.randomUUID(),
+    })
+    expect(overlap.error?.message).toContain('superpone')
   })
-  it('RLS comparte la operación pero conserva administración, mensajes y escrituras directas protegidos', async () => {
+  it('RLS comparte la operación y mensajes, manteniendo escrituras económicas directas protegidas', async () => {
     for (const table of ['appointments', 'payments', 'customers', 'activity_log']) {
       const r = await C.from(table).select('*').eq('workspace_id', workspace)
       expect(r.error).toBeNull()
@@ -586,7 +647,7 @@ describe('Supabase real: seguridad, dinero y sincronización', () => {
     }
     expect(
       (await C.from('message_templates').select('*').eq('workspace_id', workspace)).data,
-    ).toHaveLength(0)
+    ).toHaveLength(1)
     expect((await C.rpc('create_invite', { p_workspace: workspace })).error).not.toBeNull()
     const anonymous = client()
     const denied = await anonymous.rpc('record_payment', {
@@ -716,12 +777,12 @@ describe('Supabase real: seguridad, dinero y sincronización', () => {
     expect(await rpc<number>(A, 'notify_upcoming', { p_workspace: workspace })).toBe(1)
     expect(await rpc<number>(A, 'notify_upcoming', { p_workspace: workspace })).toBe(0)
   })
-  it('revocar una membresía quita el acceso al equipo pero conserva la operación global y la autoría', async () => {
+  it('la membresía histórica no limita mensajes ni cobros compartidos ni borra autoría', async () => {
     await rpc(A, 'remove_member', { p_workspace: workspace, p_user: users[1].id })
     const r = await B.from('payments').select('*').eq('workspace_id', workspace)
     expect(r.data!.length).toBeGreaterThan(0)
     const templates = await B.from('message_templates').select('*').eq('workspace_id', workspace)
-    expect(templates.data).toHaveLength(0)
+    expect(templates.data!.length).toBeGreaterThan(0)
     expect((await B.rpc('create_invite', { p_workspace: workspace })).error).not.toBeNull()
     const history = await A.from('activity_log').select('*').eq('actor_id', users[1].id)
     expect(history.data!.length).toBeGreaterThan(0)

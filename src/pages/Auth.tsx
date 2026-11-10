@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { ArrowRight, Eye, EyeOff, Layers3, UsersRound } from 'lucide-react'
+import { ArrowRight, Eye, EyeOff, Layers3 } from 'lucide-react'
 import { useAuth } from '../providers/AuthProvider'
-import { useData } from '../providers/DataProvider'
 import { useToast } from '../providers/ToastProvider'
-import { db, messageFor, rpc } from '../lib/supabase'
+import { db, messageFor } from '../lib/supabase'
 import { Button, Field } from '../components/ui'
 
 export function Brand({ small = false }: { small?: boolean }) {
@@ -197,106 +196,5 @@ export function AuthPage() {
         </div>
       </div>
     </main>
-  )
-}
-export function WorkspaceOnboarding({
-  embedded = false,
-  onSaved,
-}: {
-  embedded?: boolean
-  onSaved?: () => void
-}) {
-  const { refresh } = useData()
-  const notify = useToast()
-  const initialToken = new URLSearchParams(window.location.hash.slice(1)).get('invitation') ?? ''
-  const [join, setJoin] = useState(Boolean(initialToken))
-  const [name, setName] = useState('Nuestro espacio')
-  const [token, setToken] = useState(initialToken)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  async function submit(e: FormEvent) {
-    e.preventDefault()
-    setBusy(true)
-    setError('')
-    try {
-      await rpc(
-        join ? 'join_workspace' : 'create_workspace',
-        join
-          ? {
-              p_token: token.trim().includes('#invitation=')
-                ? token.trim().split('#invitation=')[1]
-                : token.trim(),
-            }
-          : { p_name: name.trim() },
-      )
-      if (window.location.hash.includes('invitation='))
-        window.history.replaceState(null, '', window.location.pathname)
-      await refresh()
-      notify(
-        join
-          ? 'Ya sos parte del equipo.'
-          : 'Espacio de trabajo creado. Configurá los precios de tus servicios antes de empezar.',
-      )
-      onSaved?.()
-    } catch (err) {
-      setError(messageFor(err))
-    } finally {
-      setBusy(false)
-    }
-  }
-  const Container = embedded ? 'section' : 'main'
-  return (
-    <Container className={embedded ? 'settings-panel' : 'onboarding'}>
-      {!embedded ? <Brand /> : null}
-      <div className="onboarding-card panel">
-        <span className="welcome-icon">
-          <UsersRound size={32} />
-        </span>
-        <h1>Configurar equipo</h1>
-        <p>Creá un espacio o ingresá un código de invitación.</p>
-        <div className="auth-tabs">
-          <button className={!join ? 'active' : ''} onClick={() => setJoin(false)}>
-            Crear espacio
-          </button>
-          <button className={join ? 'active' : ''} onClick={() => setJoin(true)}>
-            Tengo una invitación
-          </button>
-        </div>
-        <form onSubmit={submit} className="form-stack">
-          {join ? (
-            <Field label="Código o enlace de invitación">
-              <textarea
-                rows={3}
-                required
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                placeholder="Pegá la invitación que te compartió el administrador"
-              />
-            </Field>
-          ) : (
-            <Field label="Nombre del espacio">
-              <input
-                required
-                maxLength={120}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </Field>
-          )}
-          {error ? (
-            <p className="form-error" role="alert">
-              {error}
-            </p>
-          ) : null}
-          <Button type="submit" className="full" loading={busy}>
-            {join ? 'Unirme al equipo' : 'Crear espacio de trabajo'}
-            <ArrowRight size={17} />
-          </Button>
-        </form>
-        <Button variant="ghost" onClick={() => void db().auth.signOut()}>
-          Cerrar sesión
-        </Button>
-      </div>
-    </Container>
   )
 }

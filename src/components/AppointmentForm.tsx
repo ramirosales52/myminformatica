@@ -35,19 +35,11 @@ export function AppointmentForm({
 }) {
   const { appointmentData, workspace: selectedWorkspace, workspaces, refresh } = useData()
   const [customerId, setCustomerId] = useState(appointment?.customer_id ?? initialCustomer ?? '')
-  const customerWorkspaceId = appointmentData.customers.find(
-    (c) => c.id === customerId,
-  )?.workspace_id
-  const targetWorkspaceId = appointment?.workspace_id ?? customerWorkspaceId
+  const targetWorkspaceId = appointment?.workspace_id
   const workspace = targetWorkspaceId
     ? workspaces.find((w) => w.id === targetWorkspaceId)
     : selectedWorkspace
-  const data = {
-    ...appointmentData,
-    customers: appointmentData.customers.filter((c) => c.workspace_id === workspace?.id),
-    services: appointmentData.services.filter((s) => s.workspace_id === workspace?.id),
-    appointments: appointmentData.appointments.filter((a) => a.workspace_id === workspace?.id),
-  }
+  const data = appointmentData
   const { session } = useAuth()
   const notify = useToast()
   const [newCustomer, setNewCustomer] = useState(false)
@@ -139,7 +131,7 @@ export function AppointmentForm({
     setBusy(true)
     setError('')
     try {
-      if (!workspace) throw new Error('Conectá tu espacio de trabajo para crear turnos.')
+      if (!workspace) throw new Error('Esperá a que se conecte el negocio para crear turnos.')
       if (!lines.length) throw new Error('Seleccioná al menos un servicio del catálogo.')
       const total = toCents(amount),
         initial = toCents(initialPayment)
@@ -178,7 +170,6 @@ export function AppointmentForm({
           .from('customers')
           .update({ tz_offset_minutes: offsetMinutes })
           .eq('id', selectedCustomer.id)
-          .eq('workspace_id', workspace.id)
           .eq('version', selectedCustomer.version)
           .select()
           .single()
@@ -281,19 +272,7 @@ export function AppointmentForm({
           </div>
         ) : (
           <Field label="Cliente registrado">
-            <select
-              required
-              value={customerId}
-              onChange={(e) => {
-                const next = appointmentData.customers.find((c) => c.id === e.target.value)
-                if ((next?.workspace_id ?? selectedWorkspace?.id) !== workspace?.id) {
-                  setLines([])
-                  setAmount('0')
-                  setInitialPayment('0')
-                }
-                setCustomerId(e.target.value)
-              }}
-            >
+            <select required value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
               <option value="">Seleccionar cliente…</option>
               {(appointment ? data.customers : appointmentData.customers)
                 .filter((c) => !c.deleted_at || c.id === appointment?.customer_id)
@@ -402,7 +381,7 @@ export function AppointmentForm({
         {overlap && status !== 'cancelled' ? (
           <div className="warning">
             Este horario coincide con otro turno.
-            {workspace?.allow_overlap
+            {selectedWorkspace?.allow_overlap
               ? ' Los turnos simultáneos están habilitados.'
               : ' Elegí otro horario o habilitá superposiciones en Ajustes.'}
           </div>

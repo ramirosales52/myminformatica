@@ -14,26 +14,21 @@ import {
   Save,
   ShieldCheck,
   UserRound,
-  UserRoundPlus,
   UsersRound,
 } from 'lucide-react'
 import { useAuth } from '../providers/AuthProvider'
 import { useData } from '../providers/DataProvider'
 import { useToast } from '../providers/ToastProvider'
-import { configured, db, messageFor, rpc } from '../lib/supabase'
+import { configured, db, messageFor } from '../lib/supabase'
 import { initials } from '../lib/domain'
 import { Button, Field, PageHeading, SectionHeading } from '../components/ui'
-import { WorkspaceOnboarding } from './Auth'
 
 export function Settings({ initialTab }: { initialTab?: 'workspace' | 'profile' | 'connection' }) {
-  const { workspace, profile, workspaces, data, isAdmin, selectWorkspace, refresh, sync } =
-    useData()
+  const { workspace, profile, data, sync } = useData()
   const { session } = useAuth()
-  const notify = useToast()
   const [tab, setTab] = useState<'workspace' | 'profile' | 'connection'>(
     initialTab ?? (configured ? 'workspace' : 'connection'),
   )
-  const [workspaceSetup, setWorkspaceSetup] = useState(false)
   return (
     <div className="page">
       <PageHeading title="Ajustes" />
@@ -44,7 +39,7 @@ export function Settings({ initialTab }: { initialTab?: 'workspace' | 'profile' 
               {
                 id: 'workspace',
                 icon: Building2,
-                title: 'Espacio de trabajo',
+                title: 'Negocio y equipo',
                 description: 'Negocio y equipo',
               },
               {
@@ -104,25 +99,6 @@ export function Settings({ initialTab }: { initialTab?: 'workspace' | 'profile' 
                   subtitle="Se usan en los comprobantes, independientemente de quién inicia sesión."
                   action={<Building2 size={21} className="muted" />}
                 />
-                {workspaces.length > 1 ? (
-                  <Field label="Espacio de trabajo activo">
-                    <select value={workspace.id} onChange={(e) => selectWorkspace(e.target.value)}>
-                      {workspaces.map((w) => (
-                        <option key={w.id} value={w.id}>
-                          {w.name}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                ) : null}
-                <Button variant="secondary" onClick={() => setWorkspaceSetup((open) => !open)}>
-                  {workspaceSetup
-                    ? 'Cerrar creación de espacio'
-                    : 'Crear espacio o aceptar invitación'}
-                </Button>
-                {workspaceSetup ? (
-                  <WorkspaceOnboarding embedded onSaved={() => setWorkspaceSetup(false)} />
-                ) : null}
                 <BusinessSettings
                   key={`${workspace.id}:${workspace.name}:${workspace.allow_overlap}`}
                 />
@@ -133,86 +109,60 @@ export function Settings({ initialTab }: { initialTab?: 'workspace' | 'profile' 
                   action={<UsersRound size={20} className="muted" />}
                 />
                 <div className="team-members">
-                  {data.members.map((m) => {
-                    const p = data.profiles.find((p) => p.id === m.user_id)
+                  {data.profiles.map((p) => {
+                    const admin = data.members.some((m) => m.user_id === p.id && m.role === 'admin')
                     return (
-                      <div className="team-member" key={m.user_id}>
+                      <div className="team-member" key={p.id}>
                         <span className="avatar">{initials(p?.full_name ?? '')}</span>
                         <div>
                           <strong>
                             {p?.full_name ?? 'Integrante'}
-                            {m.user_id === session?.user.id ? ' (vos)' : ''}
+                            {p.id === session?.user.id ? ' (vos)' : ''}
                           </strong>
-                          <small>{m.role === 'admin' ? 'Administrador' : 'Integrante'}</small>
+                          <small>{admin ? 'Administrador' : 'Integrante'}</small>
                         </div>
-                        {isAdmin && m.user_id !== session?.user.id ? (
-                          <Button
-                            variant="ghost"
-                            onClick={async () => {
-                              if (
-                                !window.confirm(
-                                  `¿Quitar el acceso de ${p?.full_name ?? 'este integrante'}?`,
-                                )
-                              )
-                                return
-                              try {
-                                await rpc('remove_member', {
-                                  p_workspace: workspace.id,
-                                  p_user: m.user_id,
-                                })
-                                await refresh()
-                                notify('Acceso del integrante revocado.')
-                              } catch (err) {
-                                notify(messageFor(err), true)
-                              }
-                            }}
-                          >
-                            Quitar acceso
-                          </Button>
-                        ) : (
-                          <span className="team-badge">
-                            <ShieldCheck size={15} />
-                          </span>
-                        )}
+                        <span className="team-badge">
+                          <ShieldCheck size={15} />
+                        </span>
                       </div>
                     )
                   })}
                 </div>
-                {isAdmin ? (
-                  <InviteSettings />
-                ) : (
-                  <p className="muted small">Un administrador puede invitar nuevos integrantes.</p>
-                )}
+                <p className="muted small">
+                  Todas las cuentas registradas comparten los datos del negocio. No se necesitan
+                  invitaciones.
+                </p>
               </section>
               <section className="panel settings-panel security-note">
                 <LockKeyhole size={23} />
                 <div>
                   <h3>Permisos</h3>
                   <p>
-                    Todos los usuarios con sesión iniciada pueden gestionar cualquier turno, sus
-                    cobros y comprobantes. Solo los administradores cambian el negocio y sus
-                    accesos.
+                    Todos los usuarios con sesión iniciada comparten clientes, servicios, turnos,
+                    cobros, reportes y mensajes. Solo los administradores cambian la configuración
+                    del negocio.
                   </p>
                   <span className="live-label">
                     <span className={`tiny-dot ${sync === 'live' ? '' : 'gray'}`} />
                     {sync === 'live'
                       ? 'Sincronización en tiempo real activa'
-                      : 'Reconectando con el espacio'}
+                      : 'Reconectando con el negocio'}
                   </span>
                 </div>
               </section>
             </>
           ) : session ? (
-            <WorkspaceOnboarding embedded />
+            <section className="panel settings-panel">
+              <p>Conectando con el negocio compartido…</p>
+            </section>
           ) : (
             <section className="panel settings-panel">
               <SectionHeading
-                title="Tu espacio compartido"
+                title="Tu negocio compartido"
                 subtitle="Conectá Supabase para comenzar a guardar datos reales."
               />
               <p className="muted">
-                Una vez conectada la base, creá tu cuenta y un espacio de trabajo. Después invitá a
-                la segunda persona desde esta sección.
+                Una vez conectada la base, cada persona crea su cuenta y accede al mismo negocio.
               </p>
               <Button onClick={() => setTab('connection')}>
                 Configurar conexión
@@ -266,7 +216,7 @@ function BusinessSettings() {
     <form onSubmit={save} className="form-stack">
       <fieldset disabled={!isAdmin || busy}>
         <div className="form-grid">
-          <Field label="Nombre del espacio">
+          <Field label="Nombre del negocio">
             <input
               required
               maxLength={120}
@@ -449,62 +399,6 @@ function ProfileSettings() {
     </>
   )
 }
-function InviteSettings() {
-  const { workspace } = useData()
-  const notify = useToast()
-  const [link, setLink] = useState('')
-  const [busy, setBusy] = useState(false)
-  async function create() {
-    setBusy(true)
-    try {
-      const token = await rpc<string>('create_invite', { p_workspace: workspace!.id })
-      setLink(`${window.location.origin}/#invitation=${token}`)
-      notify('Invitación creada. Vence en 7 días y puede usarse una sola vez.')
-    } catch (err) {
-      notify(messageFor(err), true)
-    } finally {
-      setBusy(false)
-    }
-  }
-  return (
-    <div className="invite-settings">
-      <h3>
-        <UserRoundPlus size={17} />
-        Sumá a alguien a tu espacio
-      </h3>
-      <p>
-        Compartí la invitación por un canal privado. La otra persona crea su propia cuenta y pega el
-        enlace al ingresar.
-      </p>
-      <Button variant="secondary" onClick={() => void create()} loading={busy}>
-        <PlusIcon />
-        Crear invitación segura
-      </Button>
-      {link ? (
-        <div className="invite-link">
-          <input aria-label="Enlace de invitación" readOnly value={link} />
-          <Button
-            variant="secondary"
-            onClick={async () => {
-              try {
-                await navigator.clipboard.writeText(link)
-                notify('Invitación copiada.')
-              } catch {
-                notify('Copiá el enlace manualmente.', true)
-              }
-            }}
-          >
-            <Copy size={15} />
-            Copiar
-          </Button>
-        </div>
-      ) : null}
-    </div>
-  )
-}
-function PlusIcon() {
-  return <UserRoundPlus size={16} />
-}
 function ConnectionPanel() {
   const notify = useToast()
   const variables =
@@ -588,10 +482,10 @@ function ConnectionPanel() {
           <li>
             <span>4</span>
             <div>
-              <strong>Creá las dos cuentas y compartí el espacio</strong>
+              <strong>Creá las cuentas del equipo</strong>
               <p>
-                El primer usuario crea el espacio e invita al segundo desde Ajustes → Equipo. Cada
-                persona entra con su correo y contraseña.
+                Cada persona entra con su correo y contraseña. Todas acceden automáticamente al
+                mismo negocio.
               </p>
             </div>
           </li>

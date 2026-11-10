@@ -28,7 +28,7 @@ export function CustomerForm({
     setError('')
     setBusy(true)
     try {
-      if (!workspace) throw new Error('Conectá tu espacio de trabajo antes de guardar.')
+      if (!workspace) throw new Error('Esperá a que se conecte el negocio antes de guardar.')
       const values = {
         full_name: name.trim(),
         phone: normalizeOptionalPhone(phone, ''),

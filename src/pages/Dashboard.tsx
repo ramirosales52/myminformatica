@@ -117,11 +117,11 @@ export function Dashboard({
             <Radio size={21} />
           </span>
           <div>
-            <strong>Configurá tu espacio para crear turnos.</strong>
-            <p>Creá un espacio o aceptá una invitación desde Ajustes.</p>
+            <strong>Conectando con el negocio.</strong>
+            <p>Si la conexión no se completa, revisá los ajustes.</p>
           </div>
           <Button variant="secondary" onClick={() => navigate('settings')}>
-            Configurar espacio
+            Revisar conexión
             <ArrowRight size={16} />
           </Button>
         </div>
