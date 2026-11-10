@@ -7,7 +7,7 @@ Se priorizó Vite, como pide la arquitectura original; **no es Next.js**. No hab
 ## Estado de entrega
 
 - Implementación funcional con Supabase Auth, PostgreSQL, RLS, Realtime y Storage privado, verificada contra una instancia **local real y aislada**, sin mocks.
-- No se modificaron los proyectos remotos existentes. **Todavía falta crear el proyecto Supabase nuevo y desplegar en Vercel.**
+- **Desplegado en producción**: [myminformatica.vercel.app](https://myminformatica.vercel.app) sobre el proyecto Supabase `zycuhuyrzednjowjlnae` (región `sa-east-1`), con las migraciones aplicadas y los datos locales migrados.
 - Las cuentas y registros de prueba se eliminan al terminar. No se entregan clientes, turnos ni ingresos ficticios.
 - Al crear el espacio se inicializan el catálogo y las plantillas solicitadas. Los precios iniciales son **0 y deben configurarse** antes de presupuestar.
 
@@ -88,7 +88,18 @@ No compartan contraseñas ni credenciales de administración de Supabase entre o
 
 ## 4. Desplegar en Vercel
 
-1. Subí el código a tu repositorio Git, **sin `.env.local`**. En esta entrega no se creó un repositorio, commit ni publicación remota.
+Ya está desplegado y conectado al repositorio: cada push a `main` genera un deploy de producción automático.
+
+| Recurso          | Valor                                                 |
+| ---------------- | ----------------------------------------------------- |
+| Producción       | https://myminformatica.vercel.app                     |
+| Proyecto Vercel  | `ramirosales52s-projects/myminformatica`              |
+| Supabase         | `zycuhuyrzednjowjlnae` (sa-east-1)                    |
+| Variables        | `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`  |
+
+Para un proyecto nuevo desde cero:
+
+1. Subí el código a tu repositorio Git, **sin `.env.local`**.
 2. Importalo en [Vercel](https://vercel.com/new), preset **Vite**.
 
 | Campo            | Valor                               |
