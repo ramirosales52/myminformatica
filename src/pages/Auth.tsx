@@ -1,20 +1,6 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import {
-  ArrowRight,
-  CalendarCheck2,
-  Check,
-  ChevronRight,
-  Eye,
-  EyeOff,
-  Layers3,
-  LockKeyhole,
-  Monitor,
-  Radio,
-  ShieldCheck,
-  Sparkles,
-  UsersRound,
-} from 'lucide-react'
+import { ArrowRight, Eye, EyeOff, Layers3, UsersRound } from 'lucide-react'
 import { useAuth } from '../providers/AuthProvider'
 import { useData } from '../providers/DataProvider'
 import { useToast } from '../providers/ToastProvider'
@@ -88,26 +74,24 @@ export function AuthPage() {
         <div className="auth-form-wrap">
           <div className="auth-eyebrow">
             <span className="tiny-dot" />
-            TU ESPACIO DE TRABAJO
+            USO INTERNO
           </div>
           <h1>
             {recovery
-              ? 'Una nueva contraseña.'
+              ? 'Nueva contraseña'
               : mode === 'signup'
-                ? 'Empezá a organizarte.'
+                ? 'Crear cuenta'
                 : mode === 'reset'
-                  ? 'Recuperá tu acceso.'
-                  : 'Qué bueno verte.'}
+                  ? 'Recuperar acceso'
+                  : 'Iniciar sesión'}
           </h1>
-          <p>
-            {recovery
-              ? 'Elegí una contraseña segura para tu cuenta.'
-              : mode === 'signup'
-                ? 'Creá tu cuenta y compartí una sola agenda con tu equipo.'
-                : mode === 'reset'
-                  ? 'Te enviamos un enlace seguro para volver a tu agenda.'
-                  : 'Tu agenda, tus clientes y tus cobros. Todo en su lugar.'}
-          </p>
+          {recovery || mode === 'reset' ? (
+            <p>
+              {recovery
+                ? 'Elegí una contraseña segura para tu cuenta.'
+                : 'Ingresá tu correo para recibir el enlace de recuperación.'}
+            </p>
+          ) : null}
           {!recovery && mode !== 'reset' ? (
             <div className="auth-tabs">
               <button
@@ -198,10 +182,10 @@ export function AuthPage() {
               {recovery
                 ? 'Guardar contraseña'
                 : mode === 'signup'
-                  ? 'Crear mi cuenta'
+                  ? 'Crear cuenta'
                   : mode === 'reset'
                     ? 'Enviar enlace de recuperación'
-                    : 'Entrar a mi agenda'}
+                    : 'Ingresar'}
               <ArrowRight size={18} />
             </Button>
             {mode === 'reset' ? (
@@ -210,85 +194,8 @@ export function AuthPage() {
               </Button>
             ) : null}
           </form>
-          <div className="auth-security">
-            <LockKeyhole size={14} />
-            Acceso seguro · Datos privados de tu equipo
-          </div>
-        </div>
-        <div className="auth-bottom">
-          Hecho para trabajar mejor, juntos.<span>Argentina · UTC−3</span>
         </div>
       </div>
-      <aside className="auth-right">
-        <div className="auth-right-top">
-          <span>
-            <Monitor size={15} />
-            SERVICIO TÉCNICO, BIEN ORGANIZADO
-          </span>
-          <span className="live-badge">
-            <span className="tiny-dot" />
-            En equipo
-          </span>
-        </div>
-        <div className="auth-pitch">
-          <span className="eyebrow">MENOS IDAS Y VUELTAS. MÁS CLARIDAD.</span>
-          <h2>
-            Un equipo.
-            <br />
-            Una sola <span>agenda.</span>
-          </h2>
-          <p>
-            Del primer mensaje al último cobro.
-            <br />
-            Un lugar para que todo fluya.
-          </p>
-        </div>
-        <div className="workflow-card">
-          <div className="workflow-heading">
-            <span className="workflow-icon">
-              <CalendarCheck2 size={22} />
-            </span>
-            <div>
-              <strong>Cada trabajo, de principio a fin</strong>
-              <small>Un flujo simple. Nada se pierde.</small>
-            </div>
-            <Sparkles className="muted ml-auto" size={19} />
-          </div>
-          <div className="workflow-track">
-            {[
-              { icon: CalendarCheck2, label: 'Agendá', text: 'Cliente, servicio y horario' },
-              { icon: UsersRound, label: 'Coordiná', text: 'Tu equipo, sincronizado' },
-              { icon: Check, label: 'Cobrá', text: 'Cada movimiento registrado' },
-            ].map((step, i) => (
-              <div className="workflow-step" key={step.label}>
-                <span>
-                  <step.icon size={18} />
-                </span>
-                <div>
-                  <strong>{step.label}</strong>
-                  <small>{step.text}</small>
-                </div>
-                {i < 2 ? <ChevronRight size={17} className="muted" /> : null}
-              </div>
-            ))}
-          </div>
-          <div className="workflow-footer">
-            <ShieldCheck size={15} />
-            Todos los usuarios pueden gestionar todos los turnos.
-          </div>
-        </div>
-        <div className="auth-features">
-          <span>
-            <Radio size={17} />
-            Sincronización en tiempo real
-          </span>
-          <span>
-            <ShieldCheck size={17} />
-            Información protegida
-          </span>
-        </div>
-        <div className="auth-orbit" aria-hidden="true" />
-      </aside>
     </main>
   )
 }
@@ -345,11 +252,8 @@ export function WorkspaceOnboarding({
         <span className="welcome-icon">
           <UsersRound size={32} />
         </span>
-        <h1>Un lugar para tu equipo.</h1>
-        <p>
-          Creá un espacio compartido o sumate con una invitación. Cada integrante conserva su propia
-          cuenta.
-        </p>
+        <h1>Configurar equipo</h1>
+        <p>Creá un espacio o ingresá un código de invitación.</p>
         <div className="auth-tabs">
           <button className={!join ? 'active' : ''} onClick={() => setJoin(false)}>
             Crear espacio

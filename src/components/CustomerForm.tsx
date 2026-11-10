@@ -20,7 +20,6 @@ export function CustomerForm({
   const notify = useToast()
   const [name, setName] = useState(customer?.full_name ?? '')
   const [phone, setPhone] = useState(customer?.phone ?? '')
-  const [code, setCode] = useState(customer?.country_code ?? '+54')
   const [notes, setNotes] = useState(customer?.notes ?? '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -32,8 +31,7 @@ export function CustomerForm({
       if (!workspace) throw new Error('Conectá tu espacio de trabajo antes de guardar.')
       const values = {
         full_name: name.trim(),
-        phone: normalizeOptionalPhone(phone, code),
-        country_code: code,
+        phone: normalizeOptionalPhone(phone, ''),
         notes,
       }
       const request = customer
@@ -58,12 +56,7 @@ export function CustomerForm({
     }
   }
   return (
-    <Modal
-      title={customer ? 'Editar cliente' : 'Nuevo cliente'}
-      subtitle="Sus datos estarán disponibles para todo el equipo."
-      onClose={onClose}
-      busy={busy}
-    >
+    <Modal title={customer ? 'Editar cliente' : 'Nuevo cliente'} onClose={onClose} busy={busy}>
       <form onSubmit={save} className="form-stack">
         <Field label="Nombre y apellido">
           <input
@@ -75,28 +68,15 @@ export function CustomerForm({
             placeholder="Nombre del cliente"
           />
         </Field>
-        <div className="form-row code-row">
-          <Field label="Código de país">
-            <input
-              required
-              pattern="\+[1-9][0-9]{0,3}"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-            />
-          </Field>
-          <Field
-            label="WhatsApp (opcional)"
-            hint="Podés dejarlo vacío. Si lo ingresás, usá el número internacional con +."
-          >
-            <input
-              autoComplete="tel"
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+54 9 351 123 4567"
-            />
-          </Field>
-        </div>
+        <Field label="WhatsApp (opcional)" hint="Número completo con código de país.">
+          <input
+            autoComplete="tel"
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="+54 9 351 123 4567"
+          />
+        </Field>
         <Field label="Notas del cliente">
           <textarea
             rows={3}

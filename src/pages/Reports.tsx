@@ -115,9 +115,7 @@ export function Reports({ onSelect }: { onSelect: (id: string) => void }) {
   return (
     <div className="page">
       <PageHeading
-        eyebrow="LOS NÚMEROS, SIN SUPOSICIONES"
         title="Reportes de ingresos"
-        description="Lo que cobraste, lo que falta y cómo evoluciona tu trabajo."
         action={
           <Button variant="secondary" onClick={exportMovements} disabled={invalid}>
             <Download size={17} />
@@ -309,8 +307,7 @@ export function Reports({ onSelect }: { onSelect: (id: string) => void }) {
           ) : (
             <Empty
               compact
-              title="Tus servicios, en perspectiva."
-              description="Las contrataciones del período aparecerán acá."
+              title="Sin servicios contratados en este período"
               icon={<FileBarChart2 size={24} />}
             />
           )}
@@ -409,8 +406,8 @@ export function Reports({ onSelect }: { onSelect: (id: string) => void }) {
           </div>
         ) : (
           <Empty
-            title="Los ingresos empiezan con un cobro."
-            description="Todavía no hay movimientos en este período. Crear o completar turnos no suma dinero a tus ingresos."
+            title="Sin movimientos en este período"
+            description="Solo se incluyen cobros y devoluciones registrados."
             icon={<Wallet size={27} />}
           />
         )}

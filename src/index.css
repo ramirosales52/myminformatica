@@ -2007,6 +2007,7 @@ pre {
   min-width: 190px;
 }
 .table-scroll {
+  position: relative;
   width: 100%;
   overflow-x: auto;
 }
@@ -3562,13 +3563,15 @@ tbody > tr:hover {
 }
 /* Authentication */
 .auth-page {
-  display: grid;
-  grid-template-columns: 48% 52%;
+  display: flex;
+  justify-content: center;
   min-height: 100dvh;
   background: #0b1322;
 }
 .auth-left {
-  padding: 45px 9% 25px;
+  padding: 45px 32px 25px;
+  width: 100%;
+  max-width: 480px;
   display: flex;
   flex-direction: column;
   min-height: 100dvh;

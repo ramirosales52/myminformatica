@@ -158,7 +158,6 @@ export function Receipt({
   return (
     <Modal
       title="Comprobante del turno"
-      subtitle="Una copia clara del trabajo y de su situación de pago."
       onClose={onClose}
       busy={busy}
     >

@@ -5,12 +5,10 @@ import {
   CalendarCheck2,
   CalendarClock,
   CalendarDays,
-  CheckCheck,
   ChevronRight,
   Clock3,
   Plus,
   Radio,
-  Sparkles,
   UserRoundPlus,
   Wallet,
 } from 'lucide-react'
@@ -37,7 +35,7 @@ export function Dashboard({
   onSelect: (id: string) => void
   navigate: (page: Page, day?: string) => void
 }) {
-  const { data, schedule, profile, workspace } = useData()
+  const { data, schedule, workspace } = useData()
   const { session } = useAuth()
   const now = useNow()
   const day = today()
@@ -54,7 +52,6 @@ export function Dashboard({
         new Date(a.starts_at).getTime() >= now.getTime(),
     )
     .toSorted((a, b) => a.starts_at.localeCompare(b.starts_at))[0]
-  const name = profile?.full_name.split(' ')[0]
   const totalBalances = totals(appointments, data.payments)
   const recent = data.activity
     .toSorted((a, b) => b.created_at.localeCompare(a.created_at))
@@ -70,7 +67,6 @@ export function Dashboard({
       value: activeToday.length,
       icon: CalendarDays,
       color: 'blue',
-      bottom: `${todays.filter((a) => a.status === 'completed').length} trabajos completados`,
       badge: 'Hoy',
     },
     {
@@ -78,7 +74,6 @@ export function Dashboard({
       value: pending.length,
       icon: CalendarClock,
       color: 'orange',
-      bottom: pending.length ? 'Pendientes en la agenda compartida' : 'Todo al día con la agenda',
       badge: 'Agenda',
     },
     {
@@ -89,7 +84,6 @@ export function Dashboard({
       ),
       icon: Wallet,
       color: 'green',
-      bottom: 'Dinero recibido hoy · ARS',
       badge: 'Hoy',
     },
     {
@@ -100,7 +94,6 @@ export function Dashboard({
       ),
       icon: ArrowDownLeft,
       color: 'violet',
-      bottom: 'Dinero recibido hoy · USD',
       badge: 'Hoy',
     },
   ]
@@ -108,15 +101,7 @@ export function Dashboard({
     <div className="page dashboard">
       <div className="dashboard-heading">
         <div>
-          <div className="eyebrow">
-            <span className="tiny-dot" />
-            TU DÍA, BAJO CONTROL
-          </div>
-          <h1>
-            {name ? `Hola, ${name}` : 'Todo listo para un buen día'}
-            <span className="heading-spark">✦</span>
-          </h1>
-          <p>Una mirada a tu agenda. Más tiempo para lo que hacés mejor.</p>
+          <h1>Resumen del día</h1>
         </div>
         <div className="date-chip">
           <CalendarDays size={17} />
@@ -132,11 +117,8 @@ export function Dashboard({
             <Radio size={21} />
           </span>
           <div>
-            <strong>La agenda ya es compartida. Creá tu espacio para agendar.</strong>
-            <p>
-              Podés consultar todos los turnos. Para crear clientes y turnos propios, creá un
-              espacio de trabajo o aceptá una invitación desde Ajustes.
-            </p>
+            <strong>Configurá tu espacio para crear turnos.</strong>
+            <p>Creá un espacio o aceptá una invitación desde Ajustes.</p>
           </div>
           <Button variant="secondary" onClick={() => navigate('settings')}>
             Configurar espacio
@@ -157,21 +139,13 @@ export function Dashboard({
             <strong className={`stat-value ${s.color === 'green' ? 'text-green' : ''}`}>
               {ready ? s.value : '—'}
             </strong>
-            <div className="stat-bottom">
-              {s.color === 'green' || s.color === 'violet' ? (
-                <span className="tiny-dot" />
-              ) : (
-                <CheckCheck size={13} />
-              )}
-              {s.bottom}
-            </div>
           </div>
         ))}
       </div>
       <div className="dashboard-main-grid">
         <section className="panel today-panel">
           <SectionHeading
-            title="Agenda compartida de hoy"
+            title="Turnos de hoy"
             subtitle={`${activeToday.length} turnos · ${todays.filter((a) => a.status === 'completed').length} completados`}
             action={<TextLink onClick={() => navigate('agenda')}>Ver agenda</TextLink>}
           />
@@ -183,13 +157,13 @@ export function Dashboard({
             </div>
             <span className="live-label ml-auto">
               <span className={`tiny-dot ${!ready ? 'gray' : ''}`} />
-              {ready ? 'Agenda global · actualización cada 15 s' : 'Sin conectar'}
+              {ready ? 'Actualización automática' : 'Sin conectar'}
             </span>
           </div>
           <AppointmentList appointments={todays} onSelect={onSelect} onNew={onNew} />
           <div className="panel-footer">
             <Clock3 size={14} />
-            Todos los horarios se muestran en hora de Argentina.
+            Argentina · UTC−3
             <button onClick={onNew} className="text-link ml-auto">
               <Plus size={14} />
               Nuevo turno
@@ -199,7 +173,7 @@ export function Dashboard({
         <aside className="dashboard-calendar panel">
           <MiniCalendar selected={day} onSelect={(d) => navigate('agenda', d)} />
           <div className="quick-actions">
-            <h3>Un paso menos</h3>
+            <h3>Accesos rápidos</h3>
             <button onClick={onNew}>
               <span className="quick-icon blue">
                 <CalendarCheck2 size={17} />
@@ -218,7 +192,7 @@ export function Dashboard({
               <span className="quick-icon green">
                 <Wallet size={17} />
               </span>
-              <span>Revisar mis ingresos</span>
+              <span>Ver ingresos</span>
               <ChevronRight size={16} />
             </button>
           </div>
@@ -227,8 +201,7 @@ export function Dashboard({
       <div className="dashboard-secondary-grid">
         <section className="panel next-panel">
           <SectionHeading
-            title="En el horizonte"
-            subtitle="Tu próximo trabajo"
+            title="Próximo turno"
             action={<CalendarClock size={19} className="muted" />}
           />
           {next ? (
@@ -249,18 +222,13 @@ export function Dashboard({
               </Button>
             </div>
           ) : (
-            <Empty
-              compact
-              title="Tu próximo turno, acá."
-              description="Cuando agendes un trabajo, vas a ver lo que sigue de un vistazo."
-              icon={<CalendarClock size={24} />}
-            />
+            <Empty compact title="No hay próximos turnos" icon={<CalendarClock size={24} />} />
           )}
         </section>
         <section className="panel balance-panel">
           <SectionHeading
             title="Cobros de la semana"
-            subtitle="Ingresos reales · últimos 7 días"
+            subtitle="Últimos 7 días"
             action={<span className="currency-tag">ARS</span>}
           />
           <div className="chart-head">
@@ -288,8 +256,7 @@ export function Dashboard({
         </section>
         <section className="panel activity-panel">
           <SectionHeading
-            title="En tu equipo"
-            subtitle="Últimos movimientos"
+            title="Actividad del equipo"
             action={
               <span className="activity-icon">
                 <UsersIcon />
@@ -323,35 +290,13 @@ export function Dashboard({
               ))}
             </div>
           ) : (
-            <Empty
-              compact
-              title="El equipo deja su huella."
-              description="Los turnos, cobros y cambios se registran automáticamente acá."
-              icon={<Radio size={23} />}
-            />
+            <Empty compact title="Sin actividad reciente" icon={<Radio size={23} />} />
           )}
-          <div className="activity-bottom">
-            <ShieldMini />
-            Un historial compartido, sin perder detalles.
-          </div>
         </section>
       </div>
-      <footer className="dashboard-footer">
-        <span>
-          <span className="tiny-dot" />
-          Hecho para tu día a día.
-        </span>
-        <span>
-          Sin conversiones de moneda. Sin ingresos supuestos.
-          <Sparkles size={13} />
-        </span>
-      </footer>
     </div>
   )
 }
 function UsersIcon() {
   return <UserRoundPlus size={18} />
-}
-function ShieldMini() {
-  return <CheckCheck size={14} />
 }

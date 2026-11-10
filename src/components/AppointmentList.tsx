@@ -28,8 +28,7 @@ export function AppointmentList({
   if (!appointments.length)
     return (
       <Empty
-        title="Un día con espacio para más."
-        description="Todavía no hay turnos para esta fecha. Agendá un trabajo y compartilo con tu equipo."
+        title="No hay turnos para esta fecha"
         action={
           onNew ? (
             <Button variant="secondary" onClick={onNew}>

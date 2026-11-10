@@ -270,7 +270,6 @@ function WorkspaceApp() {
           </span>
           <div>
             <strong>{workspace?.name ?? 'Tu espacio de trabajo'}</strong>
-            <span>Servicio técnico remoto</span>
           </div>
           <button
             className="icon-btn"
@@ -280,11 +279,9 @@ function WorkspaceApp() {
             <ChevronDown size={14} />
           </button>
         </div>
-        <div className="nav-caption">PRINCIPAL</div>
         <nav className="main-nav" aria-label="Navegación principal">
           {NAV.map((item, i) => (
             <div key={item.id}>
-              {i === 3 ? <div className="nav-caption nav-caption-second">TU NEGOCIO</div> : null}
               {i === 6 ? <div className="nav-divider" /> : null}
               <button
                 className={page === item.id ? 'active' : ''}
@@ -321,16 +318,16 @@ function WorkspaceApp() {
                       ? 'Agenda compartida conectada'
                       : configured
                         ? 'Conectando al equipo'
-                        : 'Tu equipo, conectado'}
+                        : 'Sin configurar'}
               </strong>
               <p>
                 {sync === 'live' && online
-                  ? 'Equipo en vivo · agenda global cada 15 s'
+                  ? 'Actualización automática'
                   : sync === 'polling' && online
                     ? 'Actualización automática cada 15 s'
                     : configured
                       ? 'Reintentaremos automáticamente'
-                      : 'Activá tu espacio compartido'}
+                      : 'Configurá la conexión'}
               </p>
             </div>
             <span
@@ -359,7 +356,7 @@ function WorkspaceApp() {
               <span className="avatar profile-avatar">{initials(memberName)}</span>
               <span>
                 <strong>{memberName}</strong>
-                <small>{session ? 'Mi cuenta personal' : 'Conectá tu cuenta'}</small>
+                <small>{session ? 'Mi perfil' : 'Sin sesión'}</small>
               </span>
             </button>
             {session ? (
@@ -415,7 +412,7 @@ function WorkspaceApp() {
                 />
                 <div className="search-results">
                   <div className="dropdown-title">
-                    RESULTADOS EN TU ESPACIO
+                    RESULTADOS
                     <button
                       className="icon-btn"
                       aria-label="Cerrar resultados"
@@ -556,12 +553,7 @@ function WorkspaceApp() {
                         </div>
                       </>
                     ) : (
-                      <Empty
-                        compact
-                        title="Todo tranquilo por acá."
-                        description="Vas a ver cambios del equipo y novedades de tu agenda."
-                        icon={<Bell size={23} />}
-                      />
+                      <Empty compact title="Sin notificaciones" icon={<Bell size={23} />} />
                     )}
                   </div>
                 </>
@@ -712,7 +704,7 @@ function FullLoading() {
     <div className="full-loading">
       <Brand />
       <LoaderCircle className="spin" size={28} />
-      <p>Preparando tu espacio…</p>
+      <p>Cargando…</p>
     </div>
   )
 }
@@ -720,7 +712,7 @@ function PageLoading() {
   return (
     <div className="page-loading" role="status">
       <LoaderCircle className="spin" size={26} />
-      <span>Cargando la información de tu equipo…</span>
+      <span>Cargando…</span>
     </div>
   )
 }

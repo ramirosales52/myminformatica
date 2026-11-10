@@ -75,9 +75,7 @@ export function Services({
   return (
     <div className="page">
       <PageHeading
-        eyebrow="TU EXPERIENCIA, EN UN CATÁLOGO"
         title="Servicios"
-        description="Precios y tiempos claros. Presupuestos más simples."
         action={
           <Button
             onClick={() => {
@@ -153,7 +151,7 @@ export function Services({
                 </div>
                 <span className="service-category">{s.category}</span>
                 <h2>{s.name}</h2>
-                <p>{s.description || 'Atención técnica remota y personalizada.'}</p>
+                {s.description ? <p>{s.description}</p> : null}
                 <div className="service-duration">
                   <Clock3 size={15} />
                   {duration(s.duration_minutes)} estimados
@@ -189,8 +187,8 @@ export function Services({
       ) : (
         <section className="panel">
           <Empty
-            title={search ? 'No encontramos ese servicio.' : 'Tu catálogo empieza acá.'}
-            description="Creá servicios con sus precios en pesos y dólares. Después podrás combinarlos en cada turno."
+            title={search ? 'Sin resultados' : 'No hay servicios'}
+            description={search ? 'Probá con otro nombre.' : undefined}
             icon={<Package size={29} />}
             action={
               <Button
@@ -258,12 +256,7 @@ function ServiceForm({ service, onClose }: { service?: Service; onClose: () => v
     }
   }
   return (
-    <Modal
-      title={service ? 'Editar servicio' : 'Nuevo servicio'}
-      subtitle="El catálogo es compartido por todo tu equipo."
-      onClose={onClose}
-      busy={busy}
-    >
+    <Modal title={service ? 'Editar servicio' : 'Nuevo servicio'} onClose={onClose} busy={busy}>
       <form className="form-stack" onSubmit={save}>
         <Field label="Nombre del servicio">
           <input required maxLength={160} value={name} onChange={(e) => setName(e.target.value)} />

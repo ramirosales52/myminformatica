@@ -24,8 +24,8 @@ async function login(page: Page, email: string) {
   await page.goto('/')
   await page.getByLabel('Correo electrónico').fill(email)
   await page.getByLabel('Contraseña', { exact: true }).fill(password)
-  await page.getByRole('button', { name: 'Entrar a mi agenda' }).click()
-  await expect(page.getByRole('heading', { name: /^Hola, / })).toBeVisible()
+  await page.getByRole('button', { name: 'Ingresar', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Resumen del día' })).toBeVisible()
 }
 test.beforeAll(async () => {
   for (const [i, c] of [A, B, C].entries()) {
@@ -79,6 +79,38 @@ test.afterAll(async () => {
     await db.end()
   }
 })
+test('teléfono completo en un solo campo al crear y editar clientes', async ({ page }) => {
+  await login(page, emails[0])
+  await page.locator('.main-nav').getByRole('button', { name: 'Clientes', exact: true }).click()
+  await page.getByRole('button', { name: 'Nuevo cliente', exact: true }).click()
+  await expect(page.getByLabel('Código de país', { exact: true })).toHaveCount(0)
+  await page.getByLabel('Nombre y apellido', { exact: true }).fill('Cliente teléfono completo')
+  await page.getByLabel('WhatsApp (opcional)', { exact: true }).fill('+1 (202) 555-0187')
+  await page.getByRole('button', { name: 'Guardar cliente', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await page.locator('.customer-name').filter({ hasText: 'Cliente teléfono completo' }).click()
+  await expect(page.getByRole('dialog').getByRole('link')).toHaveAttribute(
+    'href',
+    /wa\.me\/12025550187/,
+  )
+  await page.getByRole('button', { name: 'Editar datos', exact: true }).click()
+  await expect(page.getByLabel('WhatsApp (opcional)', { exact: true })).toHaveValue('+12025550187')
+  await page.getByLabel('WhatsApp (opcional)', { exact: true }).fill('34 612 345 987')
+  await page.getByRole('button', { name: 'Guardar cliente', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  const saved = await A.from('customers')
+    .select('phone')
+    .eq('workspace_id', workspace)
+    .eq('full_name', 'Cliente teléfono completo')
+    .single()
+  expect(saved.error).toBeNull()
+  expect(saved.data?.phone).toBe('+34612345987')
+  await page.locator('.topbar-new').click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Nuevo cliente', exact: true }).click()
+  await expect(page.getByLabel('País', { exact: true })).toHaveCount(0)
+  await expect(page.getByLabel('WhatsApp (opcional)', { exact: true })).toHaveCount(1)
+})
+
 test('diferencia de hora se edita en agenda y no aparece en la ficha del cliente', async ({
   page,
 }) => {
@@ -156,7 +188,10 @@ test('teléfono opcional y clientes compartidos editables y eliminables sin memb
   await expect(row).toContainText('Sin teléfono')
   await expect(row.getByRole('link')).toHaveCount(0)
   // La misma cuenta sin membresía también puede editar clientes creados por otro usuario.
-  await page.locator('.customer-name').filter({ hasText: 'Cliente compartido sin membresía' }).click()
+  await page
+    .locator('.customer-name')
+    .filter({ hasText: 'Cliente compartido sin membresía' })
+    .click()
   await page.getByRole('button', { name: 'Editar datos', exact: true }).click()
   await page
     .getByLabel('Notas del cliente', { exact: true })
@@ -359,7 +394,7 @@ test('flujo diario completo con dos sesiones, comprobantes y persistencia real',
   await expect(page.getByRole('button', { name: 'Abrir navegación', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Abrir navegación', exact: true }).click()
   await page.locator('.main-nav').getByRole('button', { name: 'Inicio', exact: true }).click()
-  await expect(page.getByRole('heading', { name: /Hola, Verificación/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Resumen del día' })).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   )
@@ -396,7 +431,7 @@ test('flujo diario completo con dos sesiones, comprobantes y persistencia real',
   }
   await page.setViewportSize({ width: 1440, height: 1000 })
   await page.getByRole('button', { name: 'Cerrar sesión', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Qué bueno verte.' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Iniciar sesión' })).toBeVisible()
   await login(page, emails[0])
   await expect(
     page.locator('.appointment-row').filter({ hasText: 'Cliente verificado' }).first(),

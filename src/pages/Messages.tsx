@@ -73,9 +73,7 @@ export function Messages({
   return (
     <div className="page">
       <PageHeading
-        eyebrow="LAS PALABRAS JUSTAS, A MANO"
         title="Mensajes"
-        description="Respuestas que ahorran tiempo, con el toque de tu equipo."
         action={
           <Button
             onClick={() => {
@@ -90,7 +88,7 @@ export function Messages({
       <div className="messages-info">
         <Variable size={20} />
         <div>
-          <strong>Un mensaje, cada cliente.</strong>
+          <strong>Variables del turno</strong>
           <p>
             Usá variables como {'{nombre_cliente}'} o {'{fecha}'}. Al preparar el envío se completan
             con los datos del turno.
@@ -161,8 +159,7 @@ export function Messages({
       ) : (
         <section className="panel">
           <Empty
-            title="Tus respuestas, a un clic."
-            description="Guardá explicaciones, confirmaciones y recordatorios. Todo el equipo podrá usarlos."
+            title="No hay mensajes guardados"
             icon={<MessagesSquare size={28} />}
             action={
               <Button

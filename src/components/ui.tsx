@@ -156,7 +156,7 @@ export function Empty({
   icon = <CalendarDays size={26} />,
 }: {
   title: string
-  description: string
+  description?: string
   action?: ReactNode
   compact?: boolean
   icon?: ReactNode
@@ -165,7 +165,7 @@ export function Empty({
     <div className={`empty ${compact ? 'empty-compact' : ''}`}>
       <div className="empty-icon">{icon}</div>
       <h3>{title}</h3>
-      <p>{description}</p>
+      {description ? <p>{description}</p> : null}
       {action}
     </div>
   )
@@ -205,7 +205,7 @@ export function PageHeading({
 }: {
   eyebrow?: string
   title: string
-  description: string
+  description?: string
   action?: ReactNode
 }) {
   return (
@@ -213,7 +213,7 @@ export function PageHeading({
       <div>
         {eyebrow ? <span className="eyebrow">{eyebrow}</span> : null}
         <h1>{title}</h1>
-        <p>{description}</p>
+        {description ? <p>{description}</p> : null}
       </div>
       {action}
     </div>

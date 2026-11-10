@@ -36,11 +36,7 @@ export function Settings({ initialTab }: { initialTab?: 'workspace' | 'profile' 
   const [workspaceSetup, setWorkspaceSetup] = useState(false)
   return (
     <div className="page">
-      <PageHeading
-        eyebrow="UN ESPACIO A TU MEDIDA"
-        title="Ajustes"
-        description="Tu perfil, tu negocio y las personas con las que trabajás."
-      />
+      <PageHeading title="Ajustes" />
       <div className="settings-layout">
         <nav className="settings-tabs" aria-label="Secciones de ajustes">
           {(
@@ -134,7 +130,6 @@ export function Settings({ initialTab }: { initialTab?: 'workspace' | 'profile' 
               <section className="panel settings-panel">
                 <SectionHeading
                   title="Tu equipo"
-                  subtitle="Cuentas individuales. Una agenda compartida."
                   action={<UsersRound size={20} className="muted" />}
                 />
                 <div className="team-members">
@@ -192,7 +187,7 @@ export function Settings({ initialTab }: { initialTab?: 'workspace' | 'profile' 
               <section className="panel settings-panel security-note">
                 <LockKeyhole size={23} />
                 <div>
-                  <h3>La información es del equipo.</h3>
+                  <h3>Permisos</h3>
                   <p>
                     Todos los usuarios con sesión iniciada pueden gestionar cualquier turno, sus
                     cobros y comprobantes. Solo los administradores cambian el negocio y sus
@@ -385,7 +380,6 @@ function ProfileSettings() {
       <section className="panel settings-panel">
         <SectionHeading
           title="Datos personales"
-          subtitle="Tu agenda lleva tu nombre, no el nombre comercial."
           action={<UserRound size={21} className="muted" />}
         />
         <form className="form-stack" onSubmit={save}>
@@ -520,7 +514,6 @@ function ConnectionPanel() {
       <section className="panel settings-panel">
         <SectionHeading
           title="Conexión a Supabase"
-          subtitle="Sin servidores propios. Una base central para todo el equipo."
           action={<Database size={21} className="muted" />}
         />
         <div className={`connection-state ${configured ? 'connected' : ''}`}>
@@ -615,7 +608,6 @@ function ConnectionPanel() {
       <section className="panel settings-panel">
         <SectionHeading
           title="WhatsApp y comprobantes"
-          subtitle="Un flujo real, sin simular envíos."
           action={<Mail size={20} className="muted" />}
         />
         <p className="muted">

@@ -61,7 +61,6 @@ export function AppointmentForm({
       : '')
   const [customerName, setCustomerName] = useState('')
   const [phone, setPhone] = useState('')
-  const [code, setCode] = useState('+54')
   const [currency, setCurrency] = useState<Currency>(appointment?.currency ?? 'ARS')
   const [lines, setLines] = useState<AppointmentService[]>(
     appointment ? data.appointmentServices.filter((l) => l.appointment_id === appointment.id) : [],
@@ -148,7 +147,7 @@ export function AppointmentForm({
       const offsetMinutes = toOffsetMinutes(offset)
       let customer = customerId
       if (newCustomer) {
-        const normalized = normalizeOptionalPhone(phone, code)
+        const normalized = normalizeOptionalPhone(phone, '')
         const existing =
           normalized && data.customers.find((c) => c.phone === normalized && !c.deleted_at)
         if (existing)
@@ -161,7 +160,6 @@ export function AppointmentForm({
             workspace_id: workspace.id,
             full_name: customerName.trim(),
             phone: normalized,
-            country_code: code,
             tz_offset_minutes: offsetMinutes,
           })
           .select()
@@ -237,7 +235,6 @@ export function AppointmentForm({
   return (
     <Modal
       title={appointment ? 'Editar turno' : 'Agendar nuevo turno'}
-      subtitle="Todo lo que necesitás para coordinar el próximo trabajo."
       onClose={close}
       wide
       busy={busy}
@@ -272,24 +269,15 @@ export function AppointmentForm({
                 placeholder="Nombre del cliente"
               />
             </Field>
-            <div className="form-row code-row">
-              <Field label="País">
-                <input
-                  required
-                  value={code}
-                  pattern="\+[1-9][0-9]{0,3}"
-                  onChange={(e) => setCode(e.target.value)}
-                />
-              </Field>
-              <Field label="WhatsApp (opcional)">
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+54 9 351…"
-                />
-              </Field>
-            </div>
+            <Field label="WhatsApp (opcional)" hint="Número completo con código de país.">
+              <input
+                type="tel"
+                autoComplete="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+54 9 351 123 4567"
+              />
+            </Field>
           </div>
         ) : (
           <Field label="Cliente registrado">

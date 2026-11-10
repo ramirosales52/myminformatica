@@ -68,9 +68,7 @@ export function Agenda({
   return (
     <div className="page">
       <PageHeading
-        eyebrow="CADA TRABAJO, EN SU LUGAR"
         title="Agenda compartida"
-        description="Todos pueden crear, editar, reprogramar, cobrar y eliminar cualquier turno."
         action={
           <Button onClick={() => onNew(day)}>
             <Plus size={17} />
@@ -265,14 +263,12 @@ export function Agenda({
         <div className="panel-footer">
           <Filter size={14} />
           {countFilters ? `${countFilters} filtros activos` : 'Mostrando todos los estados'}
-          <span className="ml-auto">Los turnos cancelados conservan su historial.</span>
         </div>
       </div>
       <section className="panel upcoming-panel">
         <div className="section-heading">
           <div>
             <h2>Próximos turnos</h2>
-            <p>Lo que sigue en tu agenda, según los filtros actuales.</p>
           </div>
         </div>
         <AppointmentList

@@ -38,9 +38,7 @@ export function Customers({
   return (
     <div className="page">
       <PageHeading
-        eyebrow="PERSONAS, NO SOLO REGISTROS"
         title="Clientes"
-        description="El historial que te ayuda a dar una mejor atención."
         action={
           <Button onClick={onNew}>
             <Plus size={17} />
@@ -51,9 +49,8 @@ export function Customers({
       <div className="catalog-summary">
         <span>
           <UsersRound size={19} />
-          <strong>{data.customers.filter((c) => !c.deleted_at).length}</strong> clientes en la app
+          <strong>{data.customers.filter((c) => !c.deleted_at).length}</strong> clientes
         </span>
-        <span>Una base compartida por todo el equipo</span>
       </div>
       <div className="panel">
         <div className="catalog-toolbar">
@@ -150,12 +147,8 @@ export function Customers({
           </div>
         ) : (
           <Empty
-            title={search ? 'No encontramos ese cliente.' : 'Cada cliente tiene su historia.'}
-            description={
-              search
-                ? 'Probá con otro nombre o número de WhatsApp.'
-                : 'Registrá tu primer cliente para guardar sus datos, trabajos y cobros en un solo lugar.'
-            }
+            title={search ? 'Sin resultados' : 'No hay clientes'}
+            description={search ? 'Probá con otro nombre o número de WhatsApp.' : undefined}
             icon={<UsersRound size={29} />}
             action={
               !search ? (
