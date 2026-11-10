@@ -33,6 +33,7 @@ export function Settings({ initialTab }: { initialTab?: 'workspace' | 'profile' 
   const [tab, setTab] = useState<'workspace' | 'profile' | 'connection'>(
     initialTab ?? (configured ? 'workspace' : 'connection'),
   )
+  const [workspaceSetup, setWorkspaceSetup] = useState(false)
   return (
     <div className="page">
       <PageHeading
@@ -118,6 +119,14 @@ export function Settings({ initialTab }: { initialTab?: 'workspace' | 'profile' 
                     </select>
                   </Field>
                 ) : null}
+                <Button variant="secondary" onClick={() => setWorkspaceSetup((open) => !open)}>
+                  {workspaceSetup
+                    ? 'Cerrar creación de espacio'
+                    : 'Crear espacio o aceptar invitación'}
+                </Button>
+                {workspaceSetup ? (
+                  <WorkspaceOnboarding embedded onSaved={() => setWorkspaceSetup(false)} />
+                ) : null}
                 <BusinessSettings
                   key={`${workspace.id}:${workspace.name}:${workspace.allow_overlap}`}
                 />
@@ -185,8 +194,9 @@ export function Settings({ initialTab }: { initialTab?: 'workspace' | 'profile' 
                 <div>
                   <h3>La información es del equipo.</h3>
                   <p>
-                    Todos los usuarios pueden consultar los turnos. Solo los integrantes autorizados
-                    pueden editar y acceder a los cobros, notas privadas e historial del espacio.
+                    Todos los usuarios con sesión iniciada pueden gestionar cualquier turno, sus
+                    cobros y comprobantes. Solo los administradores cambian el negocio y sus
+                    accesos.
                   </p>
                   <span className="live-label">
                     <span className={`tiny-dot ${sync === 'live' ? '' : 'gray'}`} />

@@ -284,15 +284,13 @@ test('flujo diario completo con dos sesiones, comprobantes y persistencia real',
   await contextB.close()
 })
 
-test('un usuario sin espacio ve los turnos globales sin acciones ni datos privados', async ({
-  page,
-}) => {
+test('un usuario sin membresías gestiona turnos ajenos con libertad total', async ({ page }) => {
   const customer = await A.from('customers')
     .insert({
       workspace_id: workspace,
       full_name: 'Cliente de agenda global',
       phone: '+5493510000888',
-      notes: 'Nota privada que no debe compartirse',
+      notes: 'Cliente compartido entre operadores',
     })
     .select()
     .single()
@@ -303,6 +301,10 @@ test('un usuario sin espacio ve los turnos globales sin acciones ni datos privad
     .limit(1)
     .single()
   if (service.error) throw service.error
+  const business = await A.from('workspaces')
+    .update({ business_name: 'Negocio original del turno' })
+    .eq('id', workspace)
+  if (business.error) throw business.error
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Cordoba' }).format(
     new Date(),
   )
@@ -351,29 +353,67 @@ test('un usuario sin espacio ve los turnos globales sin acciones ni datos privad
     .filter({ hasText: 'Cliente de agenda global' })
     .first()
   await expect(row).toBeVisible()
-  await expect(row).toContainText('Solo lectura')
-  await expect(row).not.toContainText('USD')
-  await expect(row).not.toContainText('Sin cobros')
+  await expect(row).not.toContainText('Solo lectura')
+  await expect(row).toContainText('USD 123,45')
   await row.click()
   const dialog = page.getByRole('dialog')
-  await expect(dialog).toContainText('Verificación temporal de navegador')
-  await expect(dialog).toContainText('Solo lectura')
-  await expect(dialog.getByRole('button', { name: 'Registrar movimiento' })).toHaveCount(0)
-  await expect(dialog.getByRole('button', { name: 'Editar / reprogramar' })).toHaveCount(0)
-  await expect(dialog.getByRole('button', { name: 'Eliminar turno' })).toHaveCount(0)
-  await expect(dialog.getByText('Notas del trabajo')).toHaveCount(0)
-  await expect(dialog).not.toContainText('Trabajo privado de prueba')
-  await page.getByRole('button', { name: 'Cerrar detalle', exact: true }).click()
-  const rescheduled = await A.rpc('save_appointment', {
+  await expect(dialog).toContainText('Trabajo privado de prueba')
+  await expect(dialog.getByRole('button', { name: 'Registrar movimiento' })).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Eliminar turno' })).toBeVisible()
+  await dialog.getByRole('button', { name: 'Editar / reprogramar' }).click()
+  await expect(page.getByLabel('Cliente registrado')).toHaveValue(customer.data.id)
+  await page.getByLabel('Hora de inicio (24 h)').fill('23:00')
+  await page.getByLabel('Responsable', { exact: true }).selectOption(ids[2])
+  await page.getByLabel('Notas adicionales').fill('Editado desde una cuenta ajena al equipo')
+  await page.getByRole('button', { name: 'Guardar cambios', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+  await expect(row).toContainText('Reprogramado')
+  await expect(row).toContainText('23:00')
+  const edited = await A.from('appointments').select('*').eq('id', saved.data).single()
+  expect(edited.data).toMatchObject({
+    workspace_id: workspace,
+    customer_id: customer.data.id,
+    responsible_id: ids[2],
+    updated_by: ids[2],
+    version: 2,
+  })
+  const editedServices = await A.from('appointment_services')
+    .select('service_id')
+    .eq('appointment_id', saved.data)
+  expect(editedServices.data).toEqual([{ service_id: service.data.id }])
+  await row.click()
+  await dialog.getByRole('button', { name: 'Registrar movimiento' }).click()
+  await page.getByRole('button', { name: 'Cobrar saldo completo', exact: true }).click()
+  await page.getByRole('button', { name: 'Registrar cobro', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+  await expect(row).toContainText('Pagado')
+  await row.click()
+  await dialog.getByRole('button', { name: 'Comprobante', exact: true }).click()
+  await expect(page.locator('.receipt')).toContainText('Negocio original del turno')
+  await expect(page.locator('.receipt')).toContainText('USD 123,45')
+  await page.getByRole('checkbox').check()
+  await page
+    .getByRole('button', { name: 'Preparar comprobante para WhatsApp', exact: true })
+    .click()
+  await expect(
+    page.getByRole('link', { name: 'Abrir WhatsApp y confirmar envío' }),
+  ).toHaveAttribute('href', /5493510000888/)
+  await page.getByRole('button', { name: 'Revocar enlace compartido', exact: true }).click()
+  await page.getByRole('button', { name: 'Cerrar ventana', exact: true }).click()
+  const completed = await A.rpc('save_appointment', {
     p_workspace: workspace,
     p_id: saved.data,
-    p_version: 1,
+    p_version: 2,
     p_request_id: crypto.randomUUID(),
-    p_payload: { ...payload, status: 'rescheduled', starts_at: `${today}T23:00:00-03:00` },
+    p_payload: {
+      ...payload,
+      responsible_id: ids[2],
+      status: 'completed',
+      starts_at: `${today}T23:00:00-03:00`,
+    },
   })
-  if (rescheduled.error) throw rescheduled.error
-  await expect(row).toContainText('Reprogramado', { timeout: 20000 })
-  await expect(row).toContainText('23:00')
+  if (completed.error) throw completed.error
+  await expect(row).toContainText('Completado', { timeout: 20000 })
   await page.getByLabel('Búsqueda global').fill('Cliente de agenda global')
   await expect(
     page.locator('.search-results').getByText('Cliente de agenda global', { exact: true }),
@@ -381,7 +421,7 @@ test('un usuario sin espacio ve los turnos globales sin acciones ni datos privad
   await page.getByLabel('Búsqueda global').fill('3510000888')
   await expect(
     page.locator('.search-results').getByRole('button').filter({ hasText: 'Turno ·' }),
-  ).toHaveCount(0)
+  ).toContainText('Cliente de agenda global')
   await page.getByRole('button', { name: 'Cerrar búsqueda', exact: true }).click()
   await page.locator('.main-nav').getByRole('button', { name: 'Agenda', exact: true }).click()
   await page.getByRole('button', { name: 'Mes', exact: true }).click()
@@ -398,14 +438,60 @@ test('un usuario sin espacio ve los turnos globales sin acciones ni datos privad
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
     .toBe(true)
   await row.click()
-  await expect(dialog).toContainText('Solo lectura')
+  await expect(dialog.getByRole('button', { name: 'Editar / reprogramar' })).toBeVisible()
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
     .toBe(true)
   await page.getByRole('button', { name: 'Cerrar detalle', exact: true }).click()
   await page.setViewportSize({ width: 1440, height: 1000 })
+  await row.click()
+  page.once('dialog', (confirmation) => confirmation.accept())
+  await page.getByLabel('Estado del turno', { exact: true }).selectOption('cancelled')
+  await expect(dialog.getByText('Cancelado', { exact: true }).first()).toBeVisible()
+  page.once('dialog', (confirmation) => confirmation.accept())
+  await page.getByRole('button', { name: 'Eliminar turno', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+  await expect(row).toHaveCount(0)
+  const deleted = await A.from('appointments')
+    .select('deleted_at,updated_by')
+    .eq('id', saved.data)
+    .single()
+  expect(deleted.data!.deleted_at).toBeTruthy()
+  expect(deleted.data!.updated_by).toBe(ids[2])
+  const payments = await A.from('payments')
+    .select('amount_cents,created_by')
+    .eq('appointment_id', saved.data)
+  expect(payments.data).toEqual([{ amount_cents: 12345, created_by: ids[2] }])
   await page.locator('.main-nav').getByRole('button', { name: 'Ajustes', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Guardar ajustes', exact: true })).toBeDisabled()
+  await page
+    .getByRole('button', { name: 'Crear espacio o aceptar invitación', exact: true })
+    .click()
   await expect(
     page.getByRole('button', { name: 'Crear espacio de trabajo', exact: true }),
   ).toBeVisible()
+  await page.getByRole('button', { name: 'Tengo una invitación', exact: true }).click()
+  await expect(page.getByLabel('Código o enlace de invitación')).toBeVisible()
+  await page.getByRole('button', { name: 'Cerrar creación de espacio', exact: true }).click()
+  await page.getByLabel('Espacio de trabajo activo').selectOption(workspace)
+  await page.locator('.topbar-new').click()
+  await page.getByRole('button', { name: 'Nuevo cliente', exact: true }).click()
+  await page
+    .getByLabel('Nombre y apellido', { exact: true })
+    .fill('Nuevo cliente del operador global')
+  await page.getByLabel('WhatsApp', { exact: true }).fill('+5493510000777')
+  await page.locator('.service-option').first().click()
+  await page.getByLabel('Hora de inicio (24 h)').fill('05:00')
+  await page.getByRole('button', { name: 'Agendar turno', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+  const created = await A.from('appointments')
+    .select('workspace_id,responsible_id,created_by')
+    .eq('workspace_id', workspace)
+    .eq('created_by', ids[2])
+  expect(created.data).toContainEqual({
+    workspace_id: workspace,
+    responsible_id: ids[2],
+    created_by: ids[2],
+  })
+  expect((await C.from('workspace_members').select('*').eq('user_id', ids[2])).data).toHaveLength(0)
 })

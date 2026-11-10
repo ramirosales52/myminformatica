@@ -32,7 +32,7 @@ export function Agenda({
   onNew: (day?: string) => void
   onSelect: (id: string) => void
 }) {
-  const { data, schedule } = useData()
+  const { appointmentData: data, schedule } = useData()
   const [day, setDay] = useState(initialDay ?? today())
   const [view, setView] = useState<'day' | 'week' | 'month'>('week')
   const [search, setSearch] = useState('')
@@ -70,7 +70,7 @@ export function Agenda({
       <PageHeading
         eyebrow="CADA TRABAJO, EN SU LUGAR"
         title="Agenda compartida"
-        description="Todos los turnos de la app. Los de otros espacios se muestran en modo de solo lectura."
+        description="Todos pueden crear, editar, reprogramar, cobrar y eliminar cualquier turno."
         action={
           <Button onClick={() => onNew(day)}>
             <Plus size={17} />
@@ -161,7 +161,7 @@ export function Agenda({
             <label>
               Pago
               <select value={payment} onChange={(e) => setPayment(e.target.value)}>
-                <option value="all">Todos (pagos de mi espacio)</option>
+                <option value="all">Todos los pagos</option>
                 <option value="unpaid">No pagado</option>
                 <option value="partial">Pago parcial</option>
                 <option value="paid">Pagado</option>

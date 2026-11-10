@@ -17,9 +17,9 @@ Inicio; agenda diaria, semanal y mensual; clientes e historial; catálogo; mensa
 
 Turnos con múltiples servicios, precio/duración personalizados, responsable, control de superposiciones, estados, reprogramaciones auditadas y eliminación lógica. Anticipos, pagos parciales, devoluciones y correcciones inmutables. Comprobantes PNG/PDF y enlaces firmados temporales para WhatsApp.
 
-**Agenda global:** todos los usuarios con sesión iniciada ven todos los turnos, incluso si no tienen espacio o pertenecen a otro. Inicio, calendario, búsqueda y agenda muestran los turnos compartidos. Los turnos ajenos son de solo lectura: se comparten horario, duración, estado, referencia, nombres y servicios; no se comparten teléfonos, notas privadas, precios, cobros ni historial. Los turnos eliminados no se muestran. Los cambios de otros espacios se consultan cada 15 segundos con la app activa. Crear, editar y cobrar sigue requiriendo pertenecer al espacio correspondiente.
+**Agenda global con operación libre:** cualquier usuario con sesión iniciada puede crear, editar, reasignar, reprogramar, cambiar de estado y eliminar turnos de cualquier espacio, sin invitación ni membresía. También puede consultar cliente, notas, precios e historial; registrar cobros, devoluciones y correcciones; y generar o compartir comprobantes. El formulario y el comprobante siempre usan el espacio original del turno, no el espacio seleccionado en la pantalla. Cualquier usuario registrado puede ser responsable. La eliminación sigue siendo lógica y conserva cobros e historial; se mantienen las validaciones de saldo, superposiciones, idempotencia y versiones concurrentes. Los cambios se sincronizan por Realtime con reconciliación cada 15 segundos. No hay acceso sin sesión.
 
-Para habilitar esta funcionalidad en una instalación existente, aplicá `supabase/migrations/20261110153156_global_schedule.sql` antes de desplegar el frontend actualizado. Este cambio no agrega integrantes ni modifica permisos de administración.
+Para habilitar esta funcionalidad en una instalación existente, aplicá las migraciones pendientes de `supabase/migrations/` (agenda global, operación libre, consolidación de políticas e índice de responsables) antes de desplegar el frontend actualizado. Este cambio no agrega integrantes ni concede administración: el negocio, las invitaciones y las plantillas conservan permisos por espacio.
 
 ## 1. Ejecutar con Supabase local
 
@@ -45,7 +45,7 @@ En el entorno de esta entrega ya existe un `.env.local`, ignorado por Git, apunt
 npm run dev
 ```
 
-Abrí **http://localhost:5173** y creá tu cuenta para consultar la agenda global. Para agendar, creá un espacio desde Ajustes o aceptá una invitación. La confirmación por correo está desactivada **solo en la configuración local**. Se usa Auth real, no un login simulado.
+Abrí **http://localhost:5173** y creá tu cuenta para operar la agenda global. Si todavía no existe ningún espacio, creá el primero desde Ajustes. Las invitaciones solo son necesarias para acceder al equipo y a su administración, no para operar turnos. La confirmación por correo está desactivada **solo en la configuración local**. Se usa Auth real, no un login simulado.
 
 Para detener solo esta instancia: `npx supabase@2.116.0 stop`. No uses `db reset` en una base con trabajo real.
 

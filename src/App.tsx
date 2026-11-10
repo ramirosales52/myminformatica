@@ -100,7 +100,8 @@ export default function App() {
 }
 function WorkspaceApp() {
   const { session } = useAuth()
-  const { data, schedule, profile, workspace, sync, loading, error, refresh } = useData()
+  const { data, appointmentData, schedule, profile, workspace, sync, loading, error, refresh } =
+    useData()
   const notify = useToast()
   const queryClient = useQueryClient()
   const [page, setPage] = useState<Page>(initialPage)
@@ -219,8 +220,9 @@ function WorkspaceApp() {
   const foundAppointments = needle
     ? schedule
         .filter((a) => {
-          const local = data.appointments.find((item) => item.id === a.id)
-          const phone = data.customers.find((c) => c.id === local?.customer_id)?.phone ?? ''
+          const local = appointmentData.appointments.find((item) => item.id === a.id)
+          const phone =
+            appointmentData.customers.find((c) => c.id === local?.customer_id)?.phone ?? ''
           return `${a.customer_name} ${phone} ${a.responsible_name} ${a.workspace_name} ${a.services.map((s) => s.name).join(' ')}`
             .toLowerCase()
             .includes(needle)
@@ -399,7 +401,7 @@ function WorkspaceApp() {
                 setSearch(e.target.value)
                 setSearchOpen(true)
               }}
-              placeholder="Buscá turnos y datos de tu espacio…"
+              placeholder="Buscá turnos, clientes o servicios…"
             />
             <kbd>
               <Command size={11} />K
@@ -672,14 +674,16 @@ function WorkspaceApp() {
         ) : overlay?.kind === 'payment' ? (
           <PaymentForm
             appointment={
-              data.appointments.find((a) => a.id === overlay.appointment.id) ?? overlay.appointment
+              appointmentData.appointments.find((a) => a.id === overlay.appointment.id) ??
+              overlay.appointment
             }
             onClose={closeOverlay}
           />
         ) : overlay?.kind === 'receipt' ? (
           <Receipt
             appointment={
-              data.appointments.find((a) => a.id === overlay.appointment.id) ?? overlay.appointment
+              appointmentData.appointments.find((a) => a.id === overlay.appointment.id) ??
+              overlay.appointment
             }
             onClose={closeOverlay}
           />

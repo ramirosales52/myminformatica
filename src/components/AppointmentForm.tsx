@@ -32,7 +32,16 @@ export function AppointmentForm({
   onClose: () => void
   onSaved?: (id: string) => void
 }) {
-  const { data, workspace, refresh } = useData()
+  const { appointmentData, workspace: selectedWorkspace, workspaces, refresh } = useData()
+  const workspace = appointment
+    ? workspaces.find((w) => w.id === appointment.workspace_id)
+    : selectedWorkspace
+  const data = {
+    ...appointmentData,
+    customers: appointmentData.customers.filter((c) => c.workspace_id === workspace?.id),
+    services: appointmentData.services.filter((s) => s.workspace_id === workspace?.id),
+    appointments: appointmentData.appointments.filter((a) => a.workspace_id === workspace?.id),
+  }
   const { session } = useAuth()
   const notify = useToast()
   const [customerId, setCustomerId] = useState(appointment?.customer_id ?? initialCustomer ?? '')
@@ -365,9 +374,9 @@ export function AppointmentForm({
           <Field label="Responsable">
             <select required value={responsible} onChange={(e) => setResponsible(e.target.value)}>
               <option value="">Seleccionar integrante…</option>
-              {data.members.map((m) => (
-                <option key={m.user_id} value={m.user_id}>
-                  {data.profiles.find((p) => p.id === m.user_id)?.full_name ?? 'Integrante'}
+              {data.profiles.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.full_name}
                 </option>
               ))}
             </select>

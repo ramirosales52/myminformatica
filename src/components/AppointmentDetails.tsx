@@ -27,7 +27,6 @@ import {
 import { KINDS, METHODS, STATUS } from '../lib/types'
 import type { Appointment, Status } from '../lib/types'
 import { Badge, Button, Modal } from './ui'
-import { ScheduledAppointmentDetails } from './ScheduledAppointmentDetails'
 
 export function AppointmentDetails({
   appointmentId,
@@ -42,17 +41,16 @@ export function AppointmentDetails({
   onPayment: (a: Appointment) => void
   onReceipt: (a: Appointment) => void
 }) {
-  const { data, schedule, refresh } = useData()
+  const { appointmentData: data, refresh } = useData()
   const notify = useToast()
   const [busy, setBusy] = useState(false)
   const a = data.appointments.find((a) => a.id === appointmentId)
-  const scheduled = schedule.find((a) => a.id === appointmentId)
-  if (!a && scheduled)
-    return <ScheduledAppointmentDetails appointment={scheduled} onClose={onClose} />
   if (!a)
     return (
       <Modal title="Turno no disponible" onClose={onClose}>
-        <p className="muted">Este turno ya no está disponible en tu espacio de trabajo.</p>
+        <p className="muted">
+          Este turno ya no está disponible. Actualizá la agenda e intentá de nuevo.
+        </p>
       </Modal>
     )
   const customer = data.customers.find((c) => c.id === a.customer_id)

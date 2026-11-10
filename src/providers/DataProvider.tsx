@@ -24,6 +24,7 @@ async function allRows(table: string, workspace?: string, signal?: AbortSignal) 
 }
 interface DataContextValue {
   data: WorkspaceData
+  appointmentData: WorkspaceData
   schedule: ScheduledAppointment[]
   workspace: Workspace | null
   workspaces: Workspace[]
@@ -37,6 +38,7 @@ interface DataContextValue {
 }
 const DataContext = createContext<DataContextValue>({
   data: EMPTY_DATA,
+  appointmentData: EMPTY_DATA,
   schedule: [],
   workspace: null,
   workspaces: [],
@@ -62,17 +64,31 @@ export function DataProvider({ children }: { children: ReactNode }) {
     refetchInterval: 30000,
     queryFn: async ({ signal }) => {
       await rpc('ensure_profile', { p_name: fullName })
-      const [p, w] = await Promise.all([
+      const [p, w, m] = await Promise.all([
         db().from('profiles').select('*').eq('id', userId!).abortSignal(signal).single(),
         db().from('workspaces').select('*').order('created_at').abortSignal(signal),
+        db()
+          .from('workspace_members')
+          .select('workspace_id')
+          .eq('user_id', userId!)
+          .eq('active', true)
+          .abortSignal(signal),
       ])
       if (p.error) throw p.error
       if (w.error) throw w.error
-      return { profile: p.data as Profile, workspaces: w.data as Workspace[] }
+      if (m.error) throw m.error
+      return {
+        profile: p.data as Profile,
+        workspaces: w.data as Workspace[],
+        ownWorkspaceIds: new Set(m.data.map((member) => member.workspace_id as string)),
+      }
     },
   })
   const workspace =
-    account.data?.workspaces.find((w) => w.id === selected) ?? account.data?.workspaces[0] ?? null
+    account.data?.workspaces.find((w) => w.id === selected) ??
+    account.data?.workspaces.find((w) => account.data?.ownWorkspaceIds.has(w.id)) ??
+    account.data?.workspaces[0] ??
+    null
   const workspaceId = workspace?.id
   const schedule = useQuery({
     queryKey: ['schedule', userId],
@@ -95,7 +111,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const shared = useQuery({
     queryKey: ['workspace', userId, workspaceId],
     enabled: Boolean(userId && workspaceId),
-    refetchInterval: 60000,
+    refetchInterval: 15000,
     queryFn: async ({ signal }) => {
       const names = [
         'customers',
@@ -110,7 +126,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
         'workspace_members',
       ]
       const rows = await Promise.all(
-        names.map((name) => allRows(name, name === 'profiles' ? undefined : workspaceId, signal)),
+        names.map((name) =>
+          allRows(
+            name,
+            ['message_templates', 'notifications', 'workspace_members'].includes(name)
+              ? workspaceId
+              : undefined,
+            signal,
+          ),
+        ),
       )
       return {
         customers: rows[0],
@@ -157,13 +181,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
     ]) {
       channel.on(
         'postgres_changes',
-        { event: '*', schema: 'public', table, filter: `workspace_id=eq.${workspaceId}` },
+        {
+          event: '*',
+          schema: 'public',
+          table,
+          ...(['message_templates', 'notifications', 'workspace_members'].includes(table)
+            ? { filter: `workspace_id=eq.${workspaceId}` }
+            : {}),
+        },
         invalidate,
       )
     }
     channel.on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: 'workspaces', filter: `id=eq.${workspaceId}` },
+      { event: '*', schema: 'public', table: 'workspaces' },
       invalidate,
     )
     channel.on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, invalidate)
@@ -200,7 +231,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
       void db().removeChannel(channel)
     }
   }, [workspaceId, userId, refresh])
-  const data = shared.data ?? EMPTY_DATA
+  const appointmentData = shared.data ?? EMPTY_DATA
+  // Los módulos del negocio siguen en el espacio seleccionado; los formularios de
+  // turnos usan los datos globales para no mezclar catálogos, saldos o comprobantes.
+  const appointmentIds = new Set(
+    appointmentData.appointments.filter((a) => a.workspace_id === workspaceId).map((a) => a.id),
+  )
+  const data: WorkspaceData = {
+    ...appointmentData,
+    customers: appointmentData.customers.filter((c) => c.workspace_id === workspaceId),
+    services: appointmentData.services.filter((s) => s.workspace_id === workspaceId),
+    appointments: appointmentData.appointments.filter((a) => a.workspace_id === workspaceId),
+    appointmentServices: appointmentData.appointmentServices.filter(
+      (s) => s.appointment_id && appointmentIds.has(s.appointment_id),
+    ),
+    payments: appointmentData.payments.filter((p) => p.workspace_id === workspaceId),
+    activity: appointmentData.activity.filter((a) => a.workspace_id === workspaceId),
+  }
   useEffect(() => {
     if (!userId || !workspaceId) return
     const reminders = () => {
@@ -220,6 +267,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     <DataContext.Provider
       value={{
         data,
+        appointmentData,
         schedule: schedule.data ?? [],
         workspace,
         workspaces: account.data?.workspaces ?? [],

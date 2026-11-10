@@ -181,7 +181,7 @@ describe('Supabase real: seguridad, dinero y sincronización', () => {
     expect(r.error).toBeNull()
     expect(r.data.total_cents).toBe(2000)
   })
-  it('todos los usuarios, incluso sin espacio, ven la misma agenda sin datos privados', async () => {
+  it('todos los usuarios, incluso sin espacio, ven la misma agenda y sus detalles', async () => {
     for (const viewer of [A, B, C, D]) {
       const rows = await rpc<ScheduledAppointment[]>(viewer, 'global_schedule', {})
       const shared = rows.find((a) => a.id === appointment)
@@ -207,6 +207,9 @@ describe('Supabase real: seguridad, dinero y sincronización', () => {
           'services',
         ].sort(),
       )
+      const detail = await viewer.from('appointments').select('*').eq('id', appointment).single()
+      expect(detail.error).toBeNull()
+      expect(detail.data.notes).toBe(payload.notes)
     }
     const anonymous = client()
     const denied = await anonymous.rpc('global_schedule')
@@ -214,17 +217,103 @@ describe('Supabase real: seguridad, dinero y sincronización', () => {
     const fakeIdentity = await anonymous.rpc('global_schedule', { user_id: users[0].id })
     expect(fakeIdentity.error).not.toBeNull()
   })
-  it('ver un turno de otro espacio no permite editarlo ni eliminarlo', async () => {
-    const edit = await C.rpc('save_appointment', {
-      p_workspace: workspace,
-      p_id: appointment,
+  it('usuarios ajenos y sin membresías crean, editan, reasignan, cobran, devuelven y eliminan', async () => {
+    const foreignWorkspace = workspaces[1]
+    const c = await D.from('customers')
+      .insert({
+        workspace_id: foreignWorkspace,
+        full_name: 'Cliente de operación global',
+        phone: '+5493510000003',
+      })
+      .select()
+      .single()
+    expect(c.error).toBeNull()
+    const s = await D.from('services')
+      .select('id')
+      .eq('workspace_id', foreignWorkspace)
+      .limit(1)
+      .single()
+    expect(s.error).toBeNull()
+    const foreignPayload = {
+      ...payload,
+      customer_id: c.data!.id,
+      responsible_id: users[3].id,
+      starts_at: later(14),
+      services: [
+        {
+          service_id: s.data!.id,
+          name: 'Servicio global',
+          price_cents: 2000,
+          duration_minutes: 60,
+        },
+      ],
+    }
+    const id = await rpc(D, 'save_appointment', {
+      p_workspace: foreignWorkspace,
+      p_payload: foreignPayload,
+      p_request_id: crypto.randomUUID(),
+    })
+    await rpc(A, 'save_appointment', {
+      p_workspace: foreignWorkspace,
+      p_id: id,
       p_version: 1,
       p_request_id: crypto.randomUUID(),
-      p_payload: { ...payload, status: 'completed' },
+      p_payload: {
+        ...foreignPayload,
+        responsible_id: users[1].id,
+        starts_at: later(15),
+        status: 'rescheduled',
+        notes: 'Editado por otro usuario',
+      },
     })
-    expect(edit.error?.message).toContain('Sin acceso')
-    const remove = await D.rpc('delete_appointment', { p_id: appointment, p_version: 1 })
-    expect(remove.error?.message).toContain('Sin acceso')
+    const edited = await D.from('appointments').select('*').eq('id', id).single()
+    expect(edited.data).toMatchObject({
+      workspace_id: foreignWorkspace,
+      customer_id: c.data!.id,
+      responsible_id: users[1].id,
+      status: 'rescheduled',
+      created_by: users[3].id,
+      updated_by: users[0].id,
+      version: 2,
+    })
+    await rpc(B, 'record_payment', {
+      p_appointment: id,
+      p_amount: 1000,
+      p_kind: 'charge',
+      p_method: 'cash',
+      p_paid_at: new Date().toISOString(),
+      p_notes: '',
+      p_request_id: crypto.randomUUID(),
+    })
+    await rpc(D, 'record_payment', {
+      p_appointment: id,
+      p_amount: 500,
+      p_kind: 'refund',
+      p_method: 'cash',
+      p_paid_at: new Date().toISOString(),
+      p_notes: 'Devolución global',
+      p_request_id: crypto.randomUUID(),
+    })
+    const movements = await A.from('payments').select('*').eq('appointment_id', id)
+    expect(paidFor(id, movements.data as Payment[])).toBe(500)
+    const stale = await D.rpc('delete_appointment', { p_id: id, p_version: 1 })
+    expect(stale.error?.message).toContain('El turno cambió')
+    await rpc(D, 'delete_appointment', { p_id: id, p_version: 2 })
+    const deleted = await C.from('appointments')
+      .select('deleted_at,updated_by')
+      .eq('id', id)
+      .single()
+    expect(deleted.data!.deleted_at).toBeTruthy()
+    expect(deleted.data!.updated_by).toBe(users[3].id)
+    const history = await A.from('activity_log').select('actor_id,action').eq('appointment_id', id)
+    expect(
+      history.data!.some(
+        (event) => event.actor_id === users[0].id && event.action === 'Turno reprogramado',
+      ),
+    ).toBe(true)
+    expect(
+      (await D.from('workspace_members').select('*').eq('user_id', users[3].id)).data,
+    ).toHaveLength(0)
   })
   it('B cambia el estado y A recibe UPDATE por Realtime', async () => {
     await changeWithRealtime(A, 'appointments', 'UPDATE', () =>
@@ -424,12 +513,18 @@ describe('Supabase real: seguridad, dinero y sincronización', () => {
     })
     expect(cross.error?.code).toBe('23503')
   })
-  it('RLS conserva privados los registros completos, pagos, clientes y funciones', async () => {
+  it('RLS comparte la operación pero conserva administración, mensajes y escrituras directas protegidos', async () => {
     for (const table of ['appointments', 'payments', 'customers', 'activity_log']) {
       const r = await C.from(table).select('*').eq('workspace_id', workspace)
-      expect(r.data).toHaveLength(0)
+      expect(r.error).toBeNull()
+      expect(r.data!.length).toBeGreaterThan(0)
     }
-    const denied = await C.rpc('record_payment', {
+    expect(
+      (await C.from('message_templates').select('*').eq('workspace_id', workspace)).data,
+    ).toHaveLength(0)
+    expect((await C.rpc('create_invite', { p_workspace: workspace })).error).not.toBeNull()
+    const anonymous = client()
+    const denied = await anonymous.rpc('record_payment', {
       p_appointment: appointment,
       p_amount: 1,
       p_kind: 'charge',
@@ -438,7 +533,19 @@ describe('Supabase real: seguridad, dinero y sincronización', () => {
       p_notes: '',
       p_request_id: crypto.randomUUID(),
     })
-    expect(denied.error?.message).toContain('Sin acceso')
+    expect(denied.error).not.toBeNull()
+    expect(
+      (
+        await anonymous.rpc('save_appointment', {
+          p_workspace: workspace,
+          p_payload: payload,
+          p_request_id: crypto.randomUUID(),
+        })
+      ).error,
+    ).not.toBeNull()
+    expect(
+      (await anonymous.rpc('delete_appointment', { p_id: appointment, p_version: 3 })).error,
+    ).not.toBeNull()
     const direct = await A.from('payments').insert({
       workspace_id: workspace,
       appointment_id: appointment,
@@ -544,10 +651,13 @@ describe('Supabase real: seguridad, dinero y sincronización', () => {
     expect(await rpc<number>(A, 'notify_upcoming', { p_workspace: workspace })).toBe(1)
     expect(await rpc<number>(A, 'notify_upcoming', { p_workspace: workspace })).toBe(0)
   })
-  it('revocar a B corta el acceso sin borrar su autoría', async () => {
+  it('revocar una membresía quita el acceso al equipo pero conserva la operación global y la autoría', async () => {
     await rpc(A, 'remove_member', { p_workspace: workspace, p_user: users[1].id })
     const r = await B.from('payments').select('*').eq('workspace_id', workspace)
-    expect(r.data).toHaveLength(0)
+    expect(r.data!.length).toBeGreaterThan(0)
+    const templates = await B.from('message_templates').select('*').eq('workspace_id', workspace)
+    expect(templates.data).toHaveLength(0)
+    expect((await B.rpc('create_invite', { p_workspace: workspace })).error).not.toBeNull()
     const history = await A.from('activity_log').select('*').eq('actor_id', users[1].id)
     expect(history.data!.length).toBeGreaterThan(0)
   })

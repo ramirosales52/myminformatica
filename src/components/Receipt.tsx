@@ -37,7 +37,8 @@ export function Receipt({
   appointment: Appointment
   onClose: () => void
 }) {
-  const { data, workspace: latestWorkspace } = useData()
+  const { appointmentData: data, workspaces } = useData()
+  const latestWorkspace = workspaces.find((w) => w.id === latestAppointment.workspace_id) ?? null
   const notify = useToast()
   const ref = useRef<HTMLDivElement>(null)
   const [busy, setBusy] = useState(false)

@@ -37,10 +37,10 @@ Las suites crean cuentas y espacios de verificación y eliminan **solo sus UUID*
 
 ## Controles adicionales
 
-- Agenda global visible para integrantes, usuarios de otro espacio y una cuarta cuenta sin espacio. La proyección no incluye teléfonos, notas, precios, pagos ni historial; el acceso anónimo se rechaza.
-- RLS mantiene privados los registros completos de turnos, clientes, pagos y actividad; consultar la agenda global no habilita editar ni eliminar turnos ajenos.
+- Agenda y detalles operativos disponibles para integrantes, usuarios de otro espacio y una cuarta cuenta sin membresías. Acceso anónimo rechazado en lectura y RPC de escritura.
+- Operadores ajenos crean clientes/turnos, editan, reasignan responsables sin membresías, cobran, devuelven y eliminan lógicamente. Se conservan autoría, historial, versiones y validaciones económicas; administración, plantillas y escrituras directas siguen protegidas.
 - Paginación estable de la agenda global; los cambios de estado se reflejan y los turnos eliminados dejan de mostrarse.
-- Navegador: cuenta sin espacio consulta inicio, agenda diaria/mensual, búsqueda y detalle de solo lectura. Una reprogramación ajena aparece automáticamente sin recargar. Agenda y detalle global comprobados también a 360 px.
+- Navegador: cuenta sin membresías busca por teléfono, edita/reprograma un turno ajeno sin cambiar su cliente/catálogo/espacio, se asigna como responsable, cobra, comparte y revoca un comprobante con los datos comerciales originales, cancela y elimina. Recibe cambios de otro operador sin recargar y crea nuevos turnos con clientes nuevos. Agenda y detalle comprobados también a 360 px.
 - Prohibidas escrituras directas en pagos y cambios del negocio sin rol administrador.
 - Invitaciones y revocación de acceso sin borrar autoría.
 - Claves compuestas impiden referencias a clientes de otro espacio.

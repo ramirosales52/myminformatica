@@ -24,7 +24,7 @@ export function AppointmentList({
   onNew?: () => void
   showDate?: boolean
 }) {
-  const { data } = useData()
+  const { appointmentData: data } = useData()
   if (!appointments.length)
     return (
       <Empty
@@ -84,7 +84,7 @@ export function AppointmentList({
                 {state ? (
                   <span className={`payment-text ${state}`}>{PAYMENT_STATUS[state]}</span>
                 ) : (
-                  <span className="muted small">Solo lectura</span>
+                  <span className="muted small">Actualizando detalle…</span>
                 )}
               </div>
               <div className="appointment-amount">

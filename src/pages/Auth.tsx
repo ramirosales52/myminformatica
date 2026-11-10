@@ -274,7 +274,7 @@ export function AuthPage() {
           </div>
           <div className="workflow-footer">
             <ShieldCheck size={15} />
-            Turnos visibles para todos los usuarios de la app.
+            Todos los usuarios pueden gestionar todos los turnos.
           </div>
         </div>
         <div className="auth-features">
@@ -292,7 +292,13 @@ export function AuthPage() {
     </main>
   )
 }
-export function WorkspaceOnboarding({ embedded = false }: { embedded?: boolean }) {
+export function WorkspaceOnboarding({
+  embedded = false,
+  onSaved,
+}: {
+  embedded?: boolean
+  onSaved?: () => void
+}) {
   const { refresh } = useData()
   const notify = useToast()
   const initialToken = new URLSearchParams(window.location.hash.slice(1)).get('invitation') ?? ''
@@ -324,6 +330,7 @@ export function WorkspaceOnboarding({ embedded = false }: { embedded?: boolean }
           ? 'Ya sos parte del equipo.'
           : 'Espacio de trabajo creado. Configurá los precios de tus servicios antes de empezar.',
       )
+      onSaved?.()
     } catch (err) {
       setError(messageFor(err))
     } finally {

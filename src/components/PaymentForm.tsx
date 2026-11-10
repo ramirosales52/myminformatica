@@ -15,7 +15,7 @@ export function PaymentForm({
   appointment: Appointment
   onClose: () => void
 }) {
-  const { data, refresh } = useData()
+  const { appointmentData: data, refresh } = useData()
   const notify = useToast()
   const [kind, setKind] = useState<PaymentKind>('charge')
   const [method, setMethod] = useState<Method>(appointment.payment_method)
