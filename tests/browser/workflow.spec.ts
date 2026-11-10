@@ -79,6 +79,55 @@ test.afterAll(async () => {
     await db.end()
   }
 })
+test('diferencia de hora se edita en agenda y no aparece en la ficha del cliente', async ({
+  page,
+}) => {
+  const seeded = await A.from('customers')
+    .insert({
+      workspace_id: workspace,
+      full_name: 'Cliente horario',
+      phone: '+5493510000888',
+      country_code: '+54',
+      tz_offset_minutes: -120,
+    })
+    .select()
+    .single()
+  if (seeded.error) throw seeded.error
+  await login(page, emails[0])
+  await page.locator('.topbar-new').click()
+  await page.getByLabel('Cliente registrado', { exact: true }).selectOption(seeded.data.id)
+  const offset = page.getByLabel('Diferencia de hora con Argentina', { exact: true })
+  await expect(offset).toHaveValue('-2')
+  await offset.fill('-3,5')
+  await page.getByLabel('Cliente registrado', { exact: true }).selectOption('')
+  await expect(offset).toHaveValue('')
+  await page.getByLabel('Cliente registrado', { exact: true }).selectOption(seeded.data.id)
+  await expect(offset).toHaveValue('-3,5')
+  await page.getByRole('checkbox', { name: /CapCut Pro/ }).check()
+  await page.getByLabel('Fecha', { exact: true }).fill('2030-01-15')
+  await page.getByRole('button', { name: 'Agendar turno', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  const saved = await A.from('customers')
+    .select('tz_offset_minutes')
+    .eq('id', seeded.data.id)
+    .single()
+  expect(saved.error).toBeNull()
+  expect(saved.data?.tz_offset_minutes).toBe(-210)
+  await page.locator('.main-nav').getByRole('button', { name: 'Clientes', exact: true }).click()
+  await page.locator('.customer-name').filter({ hasText: 'Cliente horario' }).click()
+  await expect(page.getByRole('dialog')).not.toContainText(/Diferencia.*Argentina/)
+  await page.getByRole('button', { name: 'Editar datos', exact: true }).click()
+  await expect(page.getByLabel(/Diferencia.*Argentina/)).toHaveCount(0)
+  await page.getByRole('button', { name: 'Guardar cliente', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Guardar cliente', exact: true })).toHaveCount(0)
+  const preserved = await A.from('customers')
+    .select('tz_offset_minutes')
+    .eq('id', seeded.data.id)
+    .single()
+  expect(preserved.error).toBeNull()
+  expect(preserved.data?.tz_offset_minutes).toBe(-210)
+})
+
 test('flujo diario completo con dos sesiones, comprobantes y persistencia real', async ({
   browser,
   page,
@@ -105,9 +154,17 @@ test('flujo diario completo con dos sesiones, comprobantes y persistencia real',
   await page.getByLabel('Moneda', { exact: true }).selectOption('USD')
   await expect(page.getByLabel('Precio total', { exact: true })).toHaveValue('20')
   await page.getByLabel('Hora de inicio (24 h)').fill('14:30')
+  await page.getByLabel('Diferencia de hora con Argentina', { exact: true }).fill('-2')
   await page.getByLabel('Cobro recibido ahora').fill('10')
   await page.getByRole('button', { name: 'Agendar turno', exact: true }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
+  const savedCustomer = await A.from('customers')
+    .select('tz_offset_minutes')
+    .eq('workspace_id', workspace)
+    .eq('phone', '+5493510000999')
+    .single()
+  expect(savedCustomer.error).toBeNull()
+  expect(savedCustomer.data?.tz_offset_minutes).toBe(-120)
   await page.locator('.main-nav').getByRole('button', { name: 'Inicio', exact: true }).click()
   await expect(
     page.getByRole('button').filter({ hasText: 'Cliente verificado' }).first(),
@@ -142,6 +199,7 @@ test('flujo diario completo con dos sesiones, comprobantes y persistencia real',
   await page.getByRole('button', { name: 'Comprobante', exact: true }).click()
   await expect(page.locator('.receipt')).toContainText('Trabajo completado')
   await expect(page.locator('.receipt')).toContainText('USD 20,00')
+  await expect(page.locator('.receipt')).toContainText('12:30')
   const png = page.waitForEvent('download')
   await page.bringToFront()
   await page.getByRole('button', { name: 'Descargar PNG', exact: true }).click()

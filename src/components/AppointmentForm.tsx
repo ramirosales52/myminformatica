@@ -11,6 +11,7 @@ import {
   money,
   normalizePhone,
   toCents,
+  toOffsetMinutes,
   today,
   toUTC,
   zoned,
@@ -46,6 +47,14 @@ export function AppointmentForm({
   const notify = useToast()
   const [customerId, setCustomerId] = useState(appointment?.customer_id ?? initialCustomer ?? '')
   const [newCustomer, setNewCustomer] = useState(false)
+  const [offsetEdits, setOffsetEdits] = useState<Record<string, string>>({})
+  const offsetKey = newCustomer ? 'new' : customerId
+  const selectedCustomer = data.customers.find((c) => c.id === customerId)
+  const offset =
+    offsetEdits[offsetKey] ??
+    (!newCustomer && selectedCustomer?.tz_offset_minutes
+      ? String(selectedCustomer.tz_offset_minutes / 60)
+      : '')
   const [customerName, setCustomerName] = useState('')
   const [phone, setPhone] = useState('')
   const [code, setCode] = useState('+54')
@@ -132,6 +141,7 @@ export function AppointmentForm({
       const total = toCents(amount),
         initial = toCents(initialPayment)
       if (initial > total) throw new Error('El cobro inicial no puede superar el precio total.')
+      const offsetMinutes = toOffsetMinutes(offset)
       let customer = customerId
       if (newCustomer) {
         const normalized = normalizePhone(phone, code)
@@ -147,13 +157,30 @@ export function AppointmentForm({
             full_name: customerName.trim(),
             phone: normalized,
             country_code: code,
+            tz_offset_minutes: offsetMinutes,
           })
           .select()
           .single()
         if (err) throw err
         customer = c.id
+        setOffsetEdits((values) => ({ ...values, [c.id]: offset }))
         setCustomerId(c.id)
         setNewCustomer(false)
+        await refresh()
+      } else if (
+        selectedCustomer &&
+        offsetMinutes !== (selectedCustomer.tz_offset_minutes ?? null)
+      ) {
+        const { error: err } = await db()
+          .from('customers')
+          .update({ tz_offset_minutes: offsetMinutes })
+          .eq('id', selectedCustomer.id)
+          .eq('workspace_id', workspace.id)
+          .eq('version', selectedCustomer.version)
+          .select()
+          .single()
+        if (err) throw err
+        await refresh()
       }
       if (!customer) throw new Error('Seleccioná un cliente.')
       const moved =
@@ -353,6 +380,20 @@ export function AppointmentForm({
           {time} a {zoned(endTime({ starts_at: startsAt, duration_minutes: minutes }), 'HH:mm')} ·{' '}
           {duration(minutes)}
         </div>
+        <Field
+          label="Diferencia de hora con Argentina"
+          hint="En horas: −2 si está dos horas atrás, +4 si está cuatro horas adelante. Vacío o 0 usa la hora argentina. Se recuerda para los comprobantes de este cliente."
+        >
+          <input
+            type="text"
+            inputMode="decimal"
+            value={offset}
+            onChange={(e) =>
+              setOffsetEdits((values) => ({ ...values, [offsetKey]: e.target.value }))
+            }
+            placeholder="0"
+          />
+        </Field>
         {overlap && status !== 'cancelled' ? (
           <div className="warning">
             Este horario coincide con otro turno.

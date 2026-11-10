@@ -137,7 +137,7 @@ Usá proyectos separados para pruebas y producción.
 ## 6. Comprobantes y WhatsApp
 
 - PNG de doble resolución y PDF descargables. **No son facturas fiscales**; no hay integración con ARCA.
-- El comprobante puede mostrarse en **la hora del país del cliente**: cargás la diferencia horaria respecto de Argentina a mano en la ficha del cliente (el código telefónico no indica dónde está la persona). La agenda y los reportes siguen en hora argentina. Sin APIs externas ni cambios de horario de verano automáticos: si el país del cliente ajusta su reloj, actualizás la diferencia.
+- El comprobante puede mostrarse en **la hora del país del cliente**: cargás la diferencia de hora con Argentina en el formulario de agenda, junto a la fecha y el horario, y se recuerda para ese cliente (el código telefónico no indica dónde está la persona). No se muestra en su ficha. La agenda y los reportes siguen en hora argentina. Sin APIs externas ni cambios de horario de verano automáticos: si el país del cliente ajusta su reloj, actualizás la diferencia desde un turno.
 - Compartir pide consentimiento, carga una copia privada y firma un enlace por **1 hora**, con `cacheControl: 0` para no extender el acceso por caché.
 - Cualquiera que posea el enlace puede ver esa copia durante su vigencia. Compartilo solo con el destinatario correcto.
 - El diálogo permite revocar eliminando el archivo. La eliminación en CDN puede tardar hasta **un minuto**; no elimina copias descargadas.
