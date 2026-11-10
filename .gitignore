@@ -21,6 +21,9 @@ test-results/
 supabase/.temp/
 supabase/.branches/
 
+# Dumps locales de datos (no subir)
+.backup/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -32,3 +35,6 @@ supabase/.branches/
 *.sln
 *.sw?
 .gstack/
+
+# Vercel
+.vercel
