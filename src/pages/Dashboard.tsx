@@ -17,16 +17,7 @@ import {
 import { useData } from '../providers/DataProvider'
 import { useAuth } from '../providers/AuthProvider'
 import { configured } from '../lib/supabase'
-import {
-  initials,
-  money,
-  serviceNames,
-  shiftDay,
-  signedAmount,
-  today,
-  totals,
-  zoned,
-} from '../lib/domain'
+import { initials, money, shiftDay, signedAmount, today, totals, zoned } from '../lib/domain'
 import { useNow } from '../lib/useNow'
 import type { Page } from '../lib/navigation'
 import type { Currency } from '../lib/types'
@@ -46,16 +37,16 @@ export function Dashboard({
   onSelect: (id: string) => void
   navigate: (page: Page, day?: string) => void
 }) {
-  const { data, profile, workspace, sync } = useData()
+  const { data, schedule, profile, workspace } = useData()
   const { session } = useAuth()
   const now = useNow()
   const day = today()
   const appointments = data.appointments.filter((a) => !a.deleted_at)
-  const todays = appointments.filter((a) => zoned(a.starts_at, 'yyyy-MM-dd') === day)
+  const todays = schedule.filter((a) => zoned(a.starts_at, 'yyyy-MM-dd') === day)
   const activeToday = todays.filter((a) => a.status !== 'cancelled')
-  const pending = appointments.filter((a) => a.status === 'pending')
+  const pending = schedule.filter((a) => a.status === 'pending')
   const paymentsToday = data.payments.filter((p) => zoned(p.paid_at, 'yyyy-MM-dd') === day)
-  const next = appointments
+  const next = schedule
     .filter(
       (a) =>
         a.status !== 'cancelled' &&
@@ -72,7 +63,7 @@ export function Dashboard({
   const weekPayments = data.payments.filter(
     (p) => zoned(p.paid_at, 'yyyy-MM-dd') >= days[0] && zoned(p.paid_at, 'yyyy-MM-dd') <= day,
   )
-  const ready = Boolean(configured && session && workspace)
+  const ready = Boolean(configured && session)
   const stats = [
     {
       label: 'Turnos para hoy',
@@ -87,7 +78,7 @@ export function Dashboard({
       value: pending.length,
       icon: CalendarClock,
       color: 'orange',
-      bottom: pending.length ? 'Necesitan tu confirmación' : 'Todo al día con tu agenda',
+      bottom: pending.length ? 'Pendientes en la agenda compartida' : 'Todo al día con la agenda',
       badge: 'Agenda',
     },
     {
@@ -135,20 +126,20 @@ export function Dashboard({
           </span>
         </div>
       </div>
-      {!ready ? (
+      {!workspace ? (
         <div className="setup-banner">
           <span className="setup-icon">
             <Radio size={21} />
           </span>
           <div>
-            <strong>Conectá tu espacio. Empezá a trabajar en equipo.</strong>
+            <strong>La agenda ya es compartida. Creá tu espacio para agendar.</strong>
             <p>
-              Esta agenda no contiene datos de ejemplo. Conectá Supabase para guardar tus primeros
-              clientes y turnos.
+              Podés consultar todos los turnos. Para crear clientes y turnos propios, creá un
+              espacio de trabajo o aceptá una invitación desde Ajustes.
             </p>
           </div>
           <Button variant="secondary" onClick={() => navigate('settings')}>
-            Configurar conexión
+            Configurar espacio
             <ArrowRight size={16} />
           </Button>
         </div>
@@ -180,7 +171,7 @@ export function Dashboard({
       <div className="dashboard-main-grid">
         <section className="panel today-panel">
           <SectionHeading
-            title="Tu agenda de hoy"
+            title="Agenda compartida de hoy"
             subtitle={`${activeToday.length} turnos · ${todays.filter((a) => a.status === 'completed').length} completados`}
             action={<TextLink onClick={() => navigate('agenda')}>Ver agenda</TextLink>}
           />
@@ -191,12 +182,8 @@ export function Dashboard({
               <span>{zoned(new Date(), "MMMM 'de' yyyy")}</span>
             </div>
             <span className="live-label ml-auto">
-              <span className={`tiny-dot ${sync !== 'live' ? 'gray' : ''}`} />
-              {sync === 'live'
-                ? 'Actualizado en tiempo real'
-                : ready
-                  ? 'Conectando…'
-                  : 'Sin conectar'}
+              <span className={`tiny-dot ${!ready ? 'gray' : ''}`} />
+              {ready ? 'Agenda global · actualización cada 15 s' : 'Sin conectar'}
             </span>
           </div>
           <AppointmentList appointments={todays} onSelect={onSelect} onNew={onNew} />
@@ -247,8 +234,8 @@ export function Dashboard({
           {next ? (
             <div className="next-appointment">
               <Badge status={next.status} />
-              <h3>{data.customers.find((c) => c.id === next.customer_id)?.full_name}</h3>
-              <p>{serviceNames(next.id, data.appointmentServices)}</p>
+              <h3>{next.customer_name}</h3>
+              <p>{next.services.map((s) => s.name).join(' · ')}</p>
               <div className="next-time">
                 <span>{zoned(next.starts_at, 'HH:mm')}</span>
                 <div>

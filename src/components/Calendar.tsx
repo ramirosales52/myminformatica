@@ -11,11 +11,9 @@ export function MiniCalendar({
   onSelect: (date: string) => void
 }) {
   const [month, setMonth] = useState(selected)
-  const { data } = useData()
+  const { schedule } = useData()
   const dates = new Set(
-    data.appointments
-      .filter((a) => !a.deleted_at && a.status !== 'cancelled')
-      .map((a) => zoned(a.starts_at, 'yyyy-MM-dd')),
+    schedule.filter((a) => a.status !== 'cancelled').map((a) => zoned(a.starts_at, 'yyyy-MM-dd')),
   )
   return (
     <div className="mini-calendar">

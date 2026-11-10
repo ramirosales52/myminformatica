@@ -37,7 +37,10 @@ Las suites crean cuentas y espacios de verificación y eliminan **solo sus UUID*
 
 ## Controles adicionales
 
-- Tercera cuenta aislada mediante RLS; sin acceso a turnos, clientes, pagos ni actividad.
+- Agenda global visible para integrantes, usuarios de otro espacio y una cuarta cuenta sin espacio. La proyección no incluye teléfonos, notas, precios, pagos ni historial; el acceso anónimo se rechaza.
+- RLS mantiene privados los registros completos de turnos, clientes, pagos y actividad; consultar la agenda global no habilita editar ni eliminar turnos ajenos.
+- Paginación estable de la agenda global; los cambios de estado se reflejan y los turnos eliminados dejan de mostrarse.
+- Navegador: cuenta sin espacio consulta inicio, agenda diaria/mensual, búsqueda y detalle de solo lectura. Una reprogramación ajena aparece automáticamente sin recargar. Agenda y detalle global comprobados también a 360 px.
 - Prohibidas escrituras directas en pagos y cambios del negocio sin rol administrador.
 - Invitaciones y revocación de acceso sin borrar autoría.
 - Claves compuestas impiden referencias a clientes de otro espacio.

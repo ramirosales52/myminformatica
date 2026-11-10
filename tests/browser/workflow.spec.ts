@@ -11,7 +11,12 @@ if (!/^http:\/\/(127\.0\.0\.1|localhost):55321$/.test(url))
 const database = 'postgresql://postgres:postgres@127.0.0.1:55322/postgres'
 const A = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
 const B = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
-const emails = [`browser.a.${Date.now()}@agenda.test`, `browser.b.${Date.now()}@agenda.test`]
+const C = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
+const emails = [
+  `browser.a.${Date.now()}@agenda.test`,
+  `browser.b.${Date.now()}@agenda.test`,
+  `browser.c.${Date.now()}@agenda.test`,
+]
 const password = crypto.randomUUID() + 'aA1!'
 const ids: string[] = []
 let workspace = ''
@@ -20,10 +25,10 @@ async function login(page: Page, email: string) {
   await page.getByLabel('Correo electrónico').fill(email)
   await page.getByLabel('Contraseña', { exact: true }).fill(password)
   await page.getByRole('button', { name: 'Entrar a mi agenda' }).click()
-  await expect(page.getByRole('heading', { name: /Hola, Verificación/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /^Hola, / })).toBeVisible()
 }
 test.beforeAll(async () => {
-  for (const [i, c] of [A, B].entries()) {
+  for (const [i, c] of [A, B, C].entries()) {
     const r = await c.auth.signUp({ email: emails[i], password })
     if (r.error) throw r.error
     ids.push(r.data.user!.id)
@@ -39,7 +44,7 @@ test.beforeAll(async () => {
   if (join.error) throw join.error
 })
 test.afterAll(async () => {
-  await Promise.all([A, B].map((c) => c.removeAllChannels()))
+  await Promise.all([A, B, C].map((c) => c.removeAllChannels()))
   const db = new pg.Client({ connectionString: database })
   await db.connect()
   try {
@@ -226,7 +231,9 @@ test('flujo diario completo con dos sesiones, comprobantes y persistencia real',
   await page.locator('.main-nav').getByRole('button', { name: 'Agenda', exact: true }).click()
   for (const view of ['Día', 'Semana', 'Mes']) {
     await page.locator('.agenda-toolbar').getByRole('button', { name: view, exact: true }).click()
-    await expect(page.locator(view === 'Mes' ? '.month-view' : '.appointment-list')).toBeVisible()
+    await expect(
+      page.locator(view === 'Mes' ? '.month-view' : '.agenda-panel .appointment-list'),
+    ).toBeVisible()
   }
   await page.getByRole('button', { name: 'Hoy', exact: true }).click()
   await page.setViewportSize({ width: 390, height: 844 })
@@ -241,7 +248,7 @@ test('flujo diario completo con dos sesiones, comprobantes y persistencia real',
   for (const width of [360, 768, 1024]) {
     await page.setViewportSize({ width, height: 1000 })
     for (const [label, heading] of [
-      ['Agenda', 'Tu agenda'],
+      ['Agenda', 'Agenda compartida'],
       ['Clientes', 'Clientes'],
       ['Servicios', 'Servicios'],
       ['Mensajes', 'Mensajes'],
@@ -254,10 +261,12 @@ test('flujo diario completo con dos sesiones, comprobantes y persistencia real',
       await expect(
         page.getByRole('heading', { name: heading, exact: true, level: 1 }),
       ).toBeVisible()
-      await expect.poll(
-        () => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
-        { message: `${label} a ${width}px`, timeout: 3000 },
-      ).toBe(true)
+      await expect
+        .poll(
+          () => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+          { message: `${label} a ${width}px`, timeout: 3000 },
+        )
+        .toBe(true)
     }
   }
   await page.setViewportSize({ width: 1440, height: 1000 })
@@ -273,4 +282,130 @@ test('flujo diario completo con dos sesiones, comprobantes y persistencia real',
   await expect(page.locator('.breadcrumb')).toContainText('Agenda de Lucas')
   expect(errors).toEqual([])
   await contextB.close()
+})
+
+test('un usuario sin espacio ve los turnos globales sin acciones ni datos privados', async ({
+  page,
+}) => {
+  const customer = await A.from('customers')
+    .insert({
+      workspace_id: workspace,
+      full_name: 'Cliente de agenda global',
+      phone: '+5493510000888',
+      notes: 'Nota privada que no debe compartirse',
+    })
+    .select()
+    .single()
+  if (customer.error) throw customer.error
+  const service = await A.from('services')
+    .select('id')
+    .eq('workspace_id', workspace)
+    .limit(1)
+    .single()
+  if (service.error) throw service.error
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Cordoba' }).format(
+    new Date(),
+  )
+  const payload = {
+    customer_id: customer.data.id,
+    responsible_id: ids[0],
+    starts_at: `${today}T22:00:00-03:00`,
+    duration_minutes: 60,
+    status: 'confirmed',
+    currency: 'USD',
+    total_cents: 12345,
+    payment_method: 'cash',
+    notes: 'Trabajo privado de prueba',
+    services: [
+      {
+        service_id: service.data.id,
+        name: 'Servicio global',
+        price_cents: 12345,
+        duration_minutes: 60,
+      },
+    ],
+  }
+  const saved = await A.rpc('save_appointment', {
+    p_workspace: workspace,
+    p_request_id: crypto.randomUUID(),
+    p_payload: payload,
+  })
+  if (saved.error) throw saved.error
+  await login(page, emails[0])
+  await page.getByLabel('Búsqueda global').fill('3510000888')
+  const localPhoneMatch = page
+    .locator('.search-results')
+    .getByRole('button')
+    .filter({ hasText: 'Turno ·' })
+  await expect(localPhoneMatch).toContainText('Cliente de agenda global')
+  await localPhoneMatch.click()
+  await expect(
+    page.getByRole('dialog').getByRole('button', { name: 'Editar / reprogramar' }),
+  ).toBeVisible()
+  await page.getByRole('button', { name: 'Cerrar detalle', exact: true }).click()
+  await page.getByRole('button', { name: 'Cerrar sesión', exact: true }).click()
+  await expect(page.getByLabel('Correo electrónico')).toBeVisible()
+  await login(page, emails[2])
+  const row = page
+    .locator('.appointment-row')
+    .filter({ hasText: 'Cliente de agenda global' })
+    .first()
+  await expect(row).toBeVisible()
+  await expect(row).toContainText('Solo lectura')
+  await expect(row).not.toContainText('USD')
+  await expect(row).not.toContainText('Sin cobros')
+  await row.click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toContainText('Verificación temporal de navegador')
+  await expect(dialog).toContainText('Solo lectura')
+  await expect(dialog.getByRole('button', { name: 'Registrar movimiento' })).toHaveCount(0)
+  await expect(dialog.getByRole('button', { name: 'Editar / reprogramar' })).toHaveCount(0)
+  await expect(dialog.getByRole('button', { name: 'Eliminar turno' })).toHaveCount(0)
+  await expect(dialog.getByText('Notas del trabajo')).toHaveCount(0)
+  await expect(dialog).not.toContainText('Trabajo privado de prueba')
+  await page.getByRole('button', { name: 'Cerrar detalle', exact: true }).click()
+  const rescheduled = await A.rpc('save_appointment', {
+    p_workspace: workspace,
+    p_id: saved.data,
+    p_version: 1,
+    p_request_id: crypto.randomUUID(),
+    p_payload: { ...payload, status: 'rescheduled', starts_at: `${today}T23:00:00-03:00` },
+  })
+  if (rescheduled.error) throw rescheduled.error
+  await expect(row).toContainText('Reprogramado', { timeout: 20000 })
+  await expect(row).toContainText('23:00')
+  await page.getByLabel('Búsqueda global').fill('Cliente de agenda global')
+  await expect(
+    page.locator('.search-results').getByText('Cliente de agenda global', { exact: true }),
+  ).toBeVisible()
+  await page.getByLabel('Búsqueda global').fill('3510000888')
+  await expect(
+    page.locator('.search-results').getByRole('button').filter({ hasText: 'Turno ·' }),
+  ).toHaveCount(0)
+  await page.getByRole('button', { name: 'Cerrar búsqueda', exact: true }).click()
+  await page.locator('.main-nav').getByRole('button', { name: 'Agenda', exact: true }).click()
+  await page.getByRole('button', { name: 'Mes', exact: true }).click()
+  await expect(
+    page.locator('.month-appointment').filter({ hasText: 'Cliente' }).first(),
+  ).toBeVisible()
+  await page.getByRole('button', { name: 'Día', exact: true }).click()
+  await page.getByLabel('Buscar turnos').fill('Cliente de agenda global')
+  await expect(row).toBeVisible()
+  await page.reload()
+  await expect(row).toBeVisible()
+  await page.setViewportSize({ width: 360, height: 844 })
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+    .toBe(true)
+  await row.click()
+  await expect(dialog).toContainText('Solo lectura')
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+    .toBe(true)
+  await page.getByRole('button', { name: 'Cerrar detalle', exact: true }).click()
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await page.locator('.main-nav').getByRole('button', { name: 'Ajustes', exact: true }).click()
+  await expect(
+    page.getByRole('button', { name: 'Crear espacio de trabajo', exact: true }),
+  ).toBeVisible()
 })

@@ -10,7 +10,7 @@ import {
   serviceNames,
   zoned,
 } from '../lib/domain'
-import type { Appointment } from '../lib/types'
+import type { Appointment, ScheduledAppointment } from '../lib/types'
 import { Badge, Button, Empty } from './ui'
 
 export function AppointmentList({
@@ -19,7 +19,7 @@ export function AppointmentList({
   onNew,
   showDate = false,
 }: {
-  appointments: Appointment[]
+  appointments: (Appointment | ScheduledAppointment)[]
   onSelect: (id: string) => void
   onNew?: () => void
   showDate?: boolean
@@ -45,9 +45,14 @@ export function AppointmentList({
       {appointments
         .toSorted((a, b) => a.starts_at.localeCompare(b.starts_at))
         .map((a) => {
-          const customer = data.customers.find((c) => c.id === a.customer_id)
+          const summary = 'customer_name' in a ? a : undefined
+          const local = data.appointments.find((item) => item.id === a.id)
+          const customerName =
+            summary?.customer_name ??
+            data.customers.find((c) => c.id === local?.customer_id)?.full_name ??
+            'Cliente'
           const paid = paidFor(a.id, data.payments)
-          const state = paymentState(a.total_cents, paid)
+          const state = local ? paymentState(local.total_cents, paid) : undefined
           return (
             <button
               className={`appointment-row ${a.status === 'cancelled' ? 'is-cancelled' : ''}`}
@@ -60,27 +65,39 @@ export function AppointmentList({
                   {showDate ? zoned(a.starts_at, 'dd MMM') : duration(a.duration_minutes)}
                 </span>
               </div>
-              <span className={`avatar avatar-${a.status}`}>
-                {initials(customer?.full_name ?? '')}
-              </span>
+              <span className={`avatar avatar-${a.status}`}>{initials(customerName)}</span>
               <div className="appointment-main">
-                <strong>{customer?.full_name ?? 'Cliente'}</strong>
+                <strong>{customerName}</strong>
                 <span>
                   <Monitor size={13} />
-                  {serviceNames(a.id, data.appointmentServices)}
+                  {summary
+                    ? summary.services.map((s) => s.name).join(' · ')
+                    : serviceNames(a.id, data.appointmentServices)}
                 </span>
                 <small>
                   <Clock3 size={12} />
-                  {duration(a.duration_minutes)} · Remoto
+                  {duration(a.duration_minutes)} · {summary?.workspace_name ?? 'Remoto'}
                 </small>
               </div>
               <div className="appointment-state">
                 <Badge status={a.status} />
-                <span className={`payment-text ${state}`}>{PAYMENT_STATUS[state]}</span>
+                {state ? (
+                  <span className={`payment-text ${state}`}>{PAYMENT_STATUS[state]}</span>
+                ) : (
+                  <span className="muted small">Solo lectura</span>
+                )}
               </div>
               <div className="appointment-amount">
-                <strong>{money(a.total_cents, a.currency)}</strong>
-                <span>{paid > 0 ? `${money(paid, a.currency)} cobrado` : 'Sin cobros'}</span>
+                {local ? (
+                  <>
+                    <strong>{money(local.total_cents, local.currency)}</strong>
+                    <span>
+                      {paid > 0 ? `${money(paid, local.currency)} cobrado` : 'Sin cobros'}
+                    </span>
+                  </>
+                ) : (
+                  <span>{summary?.responsible_name}</span>
+                )}
               </div>
               <ArrowUpRight className="row-arrow" size={17} />
             </button>

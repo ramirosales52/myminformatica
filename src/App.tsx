@@ -32,7 +32,7 @@ import { useAuth } from './providers/AuthProvider'
 import { useData } from './providers/DataProvider'
 import { useToast } from './providers/ToastProvider'
 import { configured, db, messageFor } from './lib/supabase'
-import { initials, serviceNames, zoned } from './lib/domain'
+import { initials, zoned } from './lib/domain'
 import type { Appointment, Customer } from './lib/types'
 import type { Page } from './lib/navigation'
 import { AppointmentDetails } from './components/AppointmentDetails'
@@ -95,13 +95,12 @@ export default function App() {
         </div>
       </main>
     )
-  if (session && (!workspace || window.location.hash.includes('invitation=')))
-    return <WorkspaceOnboarding />
+  if (session && window.location.hash.includes('invitation=')) return <WorkspaceOnboarding />
   return <WorkspaceApp key={workspace?.id ?? 'unconfigured'} />
 }
 function WorkspaceApp() {
   const { session } = useAuth()
-  const { data, profile, workspace, sync, loading, error, refresh } = useData()
+  const { data, schedule, profile, workspace, sync, loading, error, refresh } = useData()
   const notify = useToast()
   const queryClient = useQueryClient()
   const [page, setPage] = useState<Page>(initialPage)
@@ -169,8 +168,8 @@ function WorkspaceApp() {
   function requireConnection() {
     if (!workspace || !session) {
       navigate('settings')
-      setSettingsTab('connection')
-      notify('Conectá Supabase para guardar información real en tu espacio.')
+      notify('Creá un espacio de trabajo o aceptá una invitación para guardar información.')
+      setSettingsTab('workspace')
       return false
     }
     if (!online) {
@@ -218,14 +217,14 @@ function WorkspaceApp() {
   }
   const needle = search.trim().toLowerCase()
   const foundAppointments = needle
-    ? data.appointments
-        .filter(
-          (a) =>
-            !a.deleted_at &&
-            `${data.customers.find((c) => c.id === a.customer_id)?.full_name} ${data.customers.find((c) => c.id === a.customer_id)?.phone} ${serviceNames(a.id, data.appointmentServices)}`
-              .toLowerCase()
-              .includes(needle),
-        )
+    ? schedule
+        .filter((a) => {
+          const local = data.appointments.find((item) => item.id === a.id)
+          const phone = data.customers.find((c) => c.id === local?.customer_id)?.phone ?? ''
+          return `${a.customer_name} ${phone} ${a.responsible_name} ${a.workspace_name} ${a.services.map((s) => s.name).join(' ')}`
+            .toLowerCase()
+            .includes(needle)
+        })
         .slice(0, 4)
     : []
   const foundCustomers = needle
@@ -293,13 +292,9 @@ function WorkspaceApp() {
                 <item.icon size={19} strokeWidth={1.7} />
                 <span>{item.label}</span>
                 {item.id === 'agenda' &&
-                data.appointments.filter((a) => !a.deleted_at && a.status === 'pending').length >
-                  0 ? (
+                schedule.filter((a) => a.status === 'pending').length > 0 ? (
                   <span className="nav-count">
-                    {
-                      data.appointments.filter((a) => !a.deleted_at && a.status === 'pending')
-                        .length
-                    }
+                    {schedule.filter((a) => a.status === 'pending').length}
                   </span>
                 ) : null}
                 {item.id === 'home' && page === 'home' ? <span className="nav-active-dot" /> : null}
@@ -308,7 +303,9 @@ function WorkspaceApp() {
           ))}
         </nav>
         <div className="sidebar-bottom">
-          <div className={`sync-card ${sync === 'live' && online ? 'connected' : ''}`}>
+          <div
+            className={`sync-card ${(sync === 'live' || sync === 'polling') && online ? 'connected' : ''}`}
+          >
             <span className="sync-symbol">
               <Radio size={17} />
             </span>
@@ -318,19 +315,25 @@ function WorkspaceApp() {
                   ? 'Sin conexión a Internet'
                   : sync === 'live'
                     ? 'Todo sincronizado'
-                    : configured
-                      ? 'Conectando al equipo'
-                      : 'Tu equipo, conectado'}
+                    : sync === 'polling'
+                      ? 'Agenda compartida conectada'
+                      : configured
+                        ? 'Conectando al equipo'
+                        : 'Tu equipo, conectado'}
               </strong>
               <p>
                 {sync === 'live' && online
-                  ? 'Los cambios llegan en tiempo real'
-                  : configured
-                    ? 'Reintentaremos automáticamente'
-                    : 'Activá tu espacio compartido'}
+                  ? 'Equipo en vivo · agenda global cada 15 s'
+                  : sync === 'polling' && online
+                    ? 'Actualización automática cada 15 s'
+                    : configured
+                      ? 'Reintentaremos automáticamente'
+                      : 'Activá tu espacio compartido'}
               </p>
             </div>
-            <span className={`tiny-dot ${sync === 'live' && online ? '' : 'gray'}`} />
+            <span
+              className={`tiny-dot ${(sync === 'live' || sync === 'polling') && online ? '' : 'gray'}`}
+            />
           </div>
           <button
             className="sidebar-help"
@@ -396,7 +399,7 @@ function WorkspaceApp() {
                 setSearch(e.target.value)
                 setSearchOpen(true)
               }}
-              placeholder="Buscá en tu espacio…"
+              placeholder="Buscá turnos y datos de tu espacio…"
             />
             <kbd>
               <Command size={11} />K
@@ -439,9 +442,7 @@ function WorkspaceApp() {
                     <button key={a.id} onClick={() => selectAppointment(a.id)}>
                       <CalendarDays size={16} />
                       <span>
-                        <strong>
-                          {data.customers.find((c) => c.id === a.customer_id)?.full_name}
-                        </strong>
+                        <strong>{a.customer_name}</strong>
                         <small>Turno · {zoned(a.starts_at, 'dd MMM HH:mm')}</small>
                       </span>
                       <ArrowUpRight size={14} />

@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from './AuthProvider'
 import { db, rpc } from '../lib/supabase'
 import { EMPTY_DATA } from '../lib/types'
-import type { Profile, Workspace, WorkspaceData } from '../lib/types'
+import type { Profile, ScheduledAppointment, Workspace, WorkspaceData } from '../lib/types'
 
 async function allRows(table: string, workspace?: string, signal?: AbortSignal) {
   const result: unknown[] = []
@@ -24,6 +24,7 @@ async function allRows(table: string, workspace?: string, signal?: AbortSignal) 
 }
 interface DataContextValue {
   data: WorkspaceData
+  schedule: ScheduledAppointment[]
   workspace: Workspace | null
   workspaces: Workspace[]
   profile: Profile | null
@@ -36,6 +37,7 @@ interface DataContextValue {
 }
 const DataContext = createContext<DataContextValue>({
   data: EMPTY_DATA,
+  schedule: [],
   workspace: null,
   workspaces: [],
   profile: null,
@@ -72,6 +74,24 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const workspace =
     account.data?.workspaces.find((w) => w.id === selected) ?? account.data?.workspaces[0] ?? null
   const workspaceId = workspace?.id
+  const schedule = useQuery({
+    queryKey: ['schedule', userId],
+    enabled: Boolean(userId),
+    refetchInterval: 15000,
+    queryFn: async ({ signal }) => {
+      const rows: ScheduledAppointment[] = []
+      for (let start = 0; ; start += 1000) {
+        const { data, error } = await db()
+          .rpc('global_schedule')
+          .order('id')
+          .range(start, start + 999)
+          .abortSignal(signal)
+        if (error) throw error
+        rows.push(...(data as ScheduledAppointment[]))
+        if (data.length < 1000) return rows
+      }
+    },
+  })
   const shared = useQuery({
     queryKey: ['workspace', userId, workspaceId],
     enabled: Boolean(userId && workspaceId),
@@ -110,6 +130,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['workspace', userId] }),
       queryClient.invalidateQueries({ queryKey: ['account', userId] }),
+      queryClient.invalidateQueries({ queryKey: ['schedule', userId] }),
     ])
   }, [queryClient, userId])
   useEffect(() => {
@@ -199,13 +220,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
     <DataContext.Provider
       value={{
         data,
+        schedule: schedule.data ?? [],
         workspace,
         workspaces: account.data?.workspaces ?? [],
         profile: account.data?.profile ?? null,
         loading:
-          Boolean(userId) && (account.isPending || (Boolean(workspaceId) && shared.isPending)),
-        error: account.error || shared.error,
-        sync: !userId ? 'unconfigured' : sync,
+          Boolean(userId) &&
+          (account.isPending || schedule.isPending || (Boolean(workspaceId) && shared.isPending)),
+        error: account.error || shared.error || schedule.error,
+        sync: !userId ? 'unconfigured' : !workspaceId && schedule.isSuccess ? 'polling' : sync,
         isAdmin: data.members.some((m) => m.user_id === userId && m.role === 'admin'),
         refresh,
         selectWorkspace: setSelected,

@@ -23,6 +23,7 @@ import { useToast } from '../providers/ToastProvider'
 import { configured, db, messageFor, rpc } from '../lib/supabase'
 import { initials } from '../lib/domain'
 import { Button, Field, PageHeading, SectionHeading } from '../components/ui'
+import { WorkspaceOnboarding } from './Auth'
 
 export function Settings({ initialTab }: { initialTab?: 'workspace' | 'profile' | 'connection' }) {
   const { workspace, profile, workspaces, data, isAdmin, selectWorkspace, refresh, sync } =
@@ -184,8 +185,8 @@ export function Settings({ initialTab }: { initialTab?: 'workspace' | 'profile' 
                 <div>
                   <h3>La información es del equipo.</h3>
                   <p>
-                    Solo los integrantes autorizados pueden acceder. Los cobros conservan su autor e
-                    historial, incluso si un turno se cancela.
+                    Todos los usuarios pueden consultar los turnos. Solo los integrantes autorizados
+                    pueden editar y acceder a los cobros, notas privadas e historial del espacio.
                   </p>
                   <span className="live-label">
                     <span className={`tiny-dot ${sync === 'live' ? '' : 'gray'}`} />
@@ -196,6 +197,8 @@ export function Settings({ initialTab }: { initialTab?: 'workspace' | 'profile' 
                 </div>
               </section>
             </>
+          ) : session ? (
+            <WorkspaceOnboarding embedded />
           ) : (
             <section className="panel settings-panel">
               <SectionHeading

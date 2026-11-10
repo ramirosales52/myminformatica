@@ -13,7 +13,6 @@ import {
   monthDays,
   paidFor,
   paymentState,
-  serviceNames,
   shiftDay,
   shiftMonth,
   today,
@@ -33,7 +32,7 @@ export function Agenda({
   onNew: (day?: string) => void
   onSelect: (id: string) => void
 }) {
-  const { data } = useData()
+  const { data, schedule } = useData()
   const [day, setDay] = useState(initialDay ?? today())
   const [view, setView] = useState<'day' | 'week' | 'month'>('week')
   const [search, setSearch] = useState('')
@@ -42,20 +41,22 @@ export function Agenda({
   const [responsible, setResponsible] = useState('all')
   const [payment, setPayment] = useState('all')
   const [filters, setFilters] = useState(false)
-  const appointments = data.appointments.filter((a) => {
-    if (a.deleted_at) return false
-    const c = data.customers.find((c) => c.id === a.customer_id)
+  const services = [
+    ...new Map(schedule.flatMap((a) => a.services).map((s) => [s.service_id, s])).values(),
+  ]
+  const people = [...new Map(schedule.map((a) => [a.responsible_id, a.responsible_name])).entries()]
+  const appointments = schedule.filter((a) => {
+    const local = data.appointments.find((item) => item.id === a.id)
+    const c = data.customers.find((c) => c.id === local?.customer_id)
     const haystack =
-      `${c?.full_name} ${c?.phone} ${serviceNames(a.id, data.appointmentServices)}`.toLowerCase()
+      `${a.customer_name} ${c?.phone ?? ''} ${a.services.map((s) => s.name).join(' ')} ${a.responsible_name} ${a.workspace_name}`.toLowerCase()
     return (
       haystack.includes(search.toLowerCase()) &&
       (status === 'all' || a.status === status) &&
       (responsible === 'all' || a.responsible_id === responsible) &&
-      (service === 'all' ||
-        data.appointmentServices.some(
-          (s) => s.appointment_id === a.id && s.service_id === service,
-        )) &&
-      (payment === 'all' || paymentState(a.total_cents, paidFor(a.id, data.payments)) === payment)
+      (service === 'all' || a.services.some((s) => s.service_id === service)) &&
+      (payment === 'all' ||
+        (local && paymentState(local.total_cents, paidFor(a.id, data.payments)) === payment))
     )
   })
   const days = weekDays(day)
@@ -68,8 +69,8 @@ export function Agenda({
     <div className="page">
       <PageHeading
         eyebrow="CADA TRABAJO, EN SU LUGAR"
-        title="Tu agenda"
-        description="Coordiná horarios y mantené a todo el equipo al día."
+        title="Agenda compartida"
+        description="Todos los turnos de la app. Los de otros espacios se muestran en modo de solo lectura."
         action={
           <Button onClick={() => onNew(day)}>
             <Plus size={17} />
@@ -139,8 +140,8 @@ export function Agenda({
               Servicio
               <select value={service} onChange={(e) => setService(e.target.value)}>
                 <option value="all">Todos los servicios</option>
-                {data.services.map((s) => (
-                  <option key={s.id} value={s.id}>
+                {services.map((s) => (
+                  <option key={s.service_id} value={s.service_id}>
                     {s.name}
                   </option>
                 ))}
@@ -149,10 +150,10 @@ export function Agenda({
             <label>
               Responsable
               <select value={responsible} onChange={(e) => setResponsible(e.target.value)}>
-                <option value="all">Todo el equipo</option>
-                {data.members.map((m) => (
-                  <option key={m.user_id} value={m.user_id}>
-                    {data.profiles.find((p) => p.id === m.user_id)?.full_name}
+                <option value="all">Todos los responsables</option>
+                {people.map(([id, name]) => (
+                  <option key={id} value={id}>
+                    {name}
                   </option>
                 ))}
               </select>
@@ -160,7 +161,7 @@ export function Agenda({
             <label>
               Pago
               <select value={payment} onChange={(e) => setPayment(e.target.value)}>
-                <option value="all">Todos los pagos</option>
+                <option value="all">Todos (pagos de mi espacio)</option>
                 <option value="unpaid">No pagado</option>
                 <option value="partial">Pago parcial</option>
                 <option value="paid">Pagado</option>
@@ -233,8 +234,7 @@ export function Agenda({
                       key={a.id}
                       onClick={() => onSelect(a.id)}
                     >
-                      {zoned(a.starts_at, 'HH:mm')}{' '}
-                      {data.customers.find((c) => c.id === a.customer_id)?.full_name.split(' ')[0]}
+                      {zoned(a.starts_at, 'HH:mm')} {a.customer_name.split(' ')[0]}
                     </button>
                   ))}
                 {appointments.filter((a) => zoned(a.starts_at, 'yyyy-MM-dd') === d).length > 3 ? (

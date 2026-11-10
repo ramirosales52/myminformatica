@@ -274,7 +274,7 @@ export function AuthPage() {
           </div>
           <div className="workflow-footer">
             <ShieldCheck size={15} />
-            Solo vos y las personas que invites.
+            Turnos visibles para todos los usuarios de la app.
           </div>
         </div>
         <div className="auth-features">
@@ -292,7 +292,7 @@ export function AuthPage() {
     </main>
   )
 }
-export function WorkspaceOnboarding() {
+export function WorkspaceOnboarding({ embedded = false }: { embedded?: boolean }) {
   const { refresh } = useData()
   const notify = useToast()
   const initialToken = new URLSearchParams(window.location.hash.slice(1)).get('invitation') ?? ''
@@ -330,9 +330,10 @@ export function WorkspaceOnboarding() {
       setBusy(false)
     }
   }
+  const Container = embedded ? 'section' : 'main'
   return (
-    <main className="onboarding">
-      <Brand />
+    <Container className={embedded ? 'settings-panel' : 'onboarding'}>
+      {!embedded ? <Brand /> : null}
       <div className="onboarding-card panel">
         <span className="welcome-icon">
           <UsersRound size={32} />
@@ -385,6 +386,6 @@ export function WorkspaceOnboarding() {
           Cerrar sesión
         </Button>
       </div>
-    </main>
+    </Container>
   )
 }

@@ -17,6 +17,10 @@ Inicio; agenda diaria, semanal y mensual; clientes e historial; catálogo; mensa
 
 Turnos con múltiples servicios, precio/duración personalizados, responsable, control de superposiciones, estados, reprogramaciones auditadas y eliminación lógica. Anticipos, pagos parciales, devoluciones y correcciones inmutables. Comprobantes PNG/PDF y enlaces firmados temporales para WhatsApp.
 
+**Agenda global:** todos los usuarios con sesión iniciada ven todos los turnos, incluso si no tienen espacio o pertenecen a otro. Inicio, calendario, búsqueda y agenda muestran los turnos compartidos. Los turnos ajenos son de solo lectura: se comparten horario, duración, estado, referencia, nombres y servicios; no se comparten teléfonos, notas privadas, precios, cobros ni historial. Los turnos eliminados no se muestran. Los cambios de otros espacios se consultan cada 15 segundos con la app activa. Crear, editar y cobrar sigue requiriendo pertenecer al espacio correspondiente.
+
+Para habilitar esta funcionalidad en una instalación existente, aplicá `supabase/migrations/20261110153156_global_schedule.sql` antes de desplegar el frontend actualizado. Este cambio no agrega integrantes ni modifica permisos de administración.
+
 ## 1. Ejecutar con Supabase local
 
 Requisitos: **Node.js 24 LTS recomendado** (mínimo 22), npm y Docker. Ejemplos verificados con CLI **2.116.0**; se fija esta versión porque CLI 3 cambió sus valores predeterminados.
@@ -41,7 +45,7 @@ En el entorno de esta entrega ya existe un `.env.local`, ignorado por Git, apunt
 npm run dev
 ```
 
-Abrí **http://localhost:5173**, creá tu cuenta y el espacio de trabajo. La confirmación por correo está desactivada **solo en la configuración local**. Se usa Auth real, no un login simulado.
+Abrí **http://localhost:5173** y creá tu cuenta para consultar la agenda global. Para agendar, creá un espacio desde Ajustes o aceptá una invitación. La confirmación por correo está desactivada **solo en la configuración local**. Se usa Auth real, no un login simulado.
 
 Para detener solo esta instancia: `npx supabase@2.116.0 stop`. No uses `db reset` en una base con trabajo real.
 

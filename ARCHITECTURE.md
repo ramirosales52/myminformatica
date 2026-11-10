@@ -6,6 +6,7 @@
 - Supabase Auth, PostgreSQL, Realtime y Storage privado. No hay base de datos simulada ni clientes de ejemplo.
 - TanStack Query mantiene una caché volátil; las escrituras se confirman en PostgreSQL antes de informar éxito. Solo la sesión de Auth se persiste en el navegador.
 - Cada fila de negocio pertenece a un `workspace_id`. RLS verifica integrantes, no metadatos editables del JWT.
+- La agenda es global para cualquier usuario autenticado, incluso sin espacio. `public.global_schedule` delega a una función privada con autorización explícita que comparte solo fecha, duración, estado, referencia, nombres de cliente/responsable/espacio y servicios. No expone teléfonos, notas, importes, cobros ni historial. Las tablas completas y todas las escrituras conservan RLS por espacio. La agenda se reconcilia cada 15 segundos y al refrescar datos propios.
 - Importes enteros en centavos. ARS y USD nunca se convierten ni suman entre sí.
 - Turnos y cobros se escriben mediante RPC transaccionales; las funciones privilegiadas viven en `private`, fuera de los esquemas de la Data API, con autorización explícita y `search_path` fijo.
 - Bloqueo del espacio de trabajo para editar agenda y comprobar superposiciones; bloqueo del turno para cobrar. Versionado optimista evita sobrescribir ediciones concurrentes. UUID de solicitud evita repetir altas y cobros al reintentar.
