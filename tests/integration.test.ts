@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import pg from 'pg'
 import { inRange, paidFor, signedAmount, today } from '../src/lib/domain'
-import type { Payment } from '../src/lib/types'
+import type { Payment, ScheduledAppointment } from '../src/lib/types'
 
 // Estas pruebas ESCRIBEN, pero solo en nuestra instancia local aislada y limpian sus UUID al terminar.
 const url =
@@ -26,7 +26,8 @@ const client = () =>
   createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
 const A = client(),
   B = client(),
-  C = client()
+  C = client(),
+  D = client()
 const users: { id: string; email: string; password: string }[] = []
 const workspaces: string[] = []
 let workspace = '',
@@ -75,7 +76,7 @@ async function changeWithRealtime(
   }
 }
 beforeAll(async () => {
-  for (const [i, c] of [A, B, C].entries()) {
+  for (const [i, c] of [A, B, C, D].entries()) {
     const email = `qa.${Date.now()}.${i}@agenda.test`,
       password = crypto.randomUUID() + 'aA1!'
     const r = await c.auth.signUp({ email, password })
@@ -83,7 +84,9 @@ beforeAll(async () => {
     users.push({ id: r.data.user!.id, email, password })
     if (!r.data.session)
       throw new Error('En la instancia local la confirmación de correo debe estar desactivada.')
-    await rpc(c, 'ensure_profile', { p_name: ['Prueba A', 'Prueba B', 'Aislado C'][i] })
+    await rpc(c, 'ensure_profile', {
+      p_name: ['Prueba A', 'Prueba B', 'Aislado C', 'Sin espacio D'][i],
+    })
   }
   responsible = users[0].id
   workspace = await rpc(A, 'create_workspace', { p_name: 'QA transaccional temporal' })
@@ -127,7 +130,7 @@ beforeAll(async () => {
   }
 })
 afterAll(async () => {
-  await Promise.all([A, B, C].map((c) => c.removeAllChannels()))
+  await Promise.all([A, B, C, D].map((c) => c.removeAllChannels()))
   const connection = new pg.Client({ connectionString: database })
   await connection.connect()
   try {
@@ -178,6 +181,51 @@ describe('Supabase real: seguridad, dinero y sincronización', () => {
     expect(r.error).toBeNull()
     expect(r.data.total_cents).toBe(2000)
   })
+  it('todos los usuarios, incluso sin espacio, ven la misma agenda sin datos privados', async () => {
+    for (const viewer of [A, B, C, D]) {
+      const rows = await rpc<ScheduledAppointment[]>(viewer, 'global_schedule', {})
+      const shared = rows.find((a) => a.id === appointment)
+      expect(shared).toMatchObject({
+        customer_name: 'Cliente de prueba automatizada',
+        responsible_name: 'Prueba A',
+        workspace_id: workspace,
+        status: 'pending',
+        services: [{ service_id: service, name: 'Servicio acordado de prueba' }],
+      })
+      expect(Object.keys(shared!).sort()).toEqual(
+        [
+          'id',
+          'workspace_id',
+          'reference',
+          'starts_at',
+          'duration_minutes',
+          'status',
+          'responsible_id',
+          'customer_name',
+          'responsible_name',
+          'workspace_name',
+          'services',
+        ].sort(),
+      )
+    }
+    const anonymous = client()
+    const denied = await anonymous.rpc('global_schedule')
+    expect(denied.error).not.toBeNull()
+    const fakeIdentity = await anonymous.rpc('global_schedule', { user_id: users[0].id })
+    expect(fakeIdentity.error).not.toBeNull()
+  })
+  it('ver un turno de otro espacio no permite editarlo ni eliminarlo', async () => {
+    const edit = await C.rpc('save_appointment', {
+      p_workspace: workspace,
+      p_id: appointment,
+      p_version: 1,
+      p_request_id: crypto.randomUUID(),
+      p_payload: { ...payload, status: 'completed' },
+    })
+    expect(edit.error?.message).toContain('Sin acceso')
+    const remove = await D.rpc('delete_appointment', { p_id: appointment, p_version: 1 })
+    expect(remove.error?.message).toContain('Sin acceso')
+  })
   it('B cambia el estado y A recibe UPDATE por Realtime', async () => {
     await changeWithRealtime(A, 'appointments', 'UPDATE', () =>
       rpc(B, 'save_appointment', {
@@ -190,6 +238,8 @@ describe('Supabase real: seguridad, dinero y sincronización', () => {
     )
     const r = await A.from('appointments').select('status,version').eq('id', appointment).single()
     expect(r.data).toEqual({ status: 'confirmed', version: 2 })
+    const global = await rpc<ScheduledAppointment[]>(C, 'global_schedule', {})
+    expect(global.find((a) => a.id === appointment)?.status).toBe('confirmed')
   })
   it('bloquea una edición obsoleta sin sobrescribir cambios', async () => {
     const r = await A.rpc('save_appointment', {
@@ -270,6 +320,18 @@ describe('Supabase real: seguridad, dinero y sincronización', () => {
     expect(ps.filter((p) => p.currency === 'ARS').reduce((s, p) => s + signedAmount(p), 0)).toBe(
       1250000,
     )
+  })
+  it('la agenda global admite paginación estable sin filtrar por espacio', async () => {
+    const pages = await Promise.all(
+      [0, 1].map((offset) =>
+        C.rpc('global_schedule').eq('workspace_id', workspace).order('id').range(offset, offset),
+      ),
+    )
+    for (const page of pages) {
+      expect(page.error).toBeNull()
+      expect(page.data).toHaveLength(1)
+    }
+    expect(pages[0].data![0].id).not.toBe(pages[1].data![0].id)
   })
   it('un anticipo inválido revierte el alta completa', async () => {
     const request = crypto.randomUUID()
@@ -362,7 +424,7 @@ describe('Supabase real: seguridad, dinero y sincronización', () => {
     })
     expect(cross.error?.code).toBe('23503')
   })
-  it('RLS aísla turnos, pagos, clientes y funciones', async () => {
+  it('RLS conserva privados los registros completos, pagos, clientes y funciones', async () => {
     for (const table of ['appointments', 'payments', 'customers', 'activity_log']) {
       const r = await C.from(table).select('*').eq('workspace_id', workspace)
       expect(r.data).toHaveLength(0)
@@ -428,6 +490,8 @@ describe('Supabase real: seguridad, dinero y sincronización', () => {
     const r = await B.from('appointments').select('deleted_at').eq('id', arsAppointment).single()
     expect(r.data?.deleted_at).toBeTruthy()
     expect(paidFor(arsAppointment, await getPayments())).toBe(1250000)
+    const global = await rpc<ScheduledAppointment[]>(C, 'global_schedule', {})
+    expect(global.some((a) => a.id === arsAppointment)).toBe(false)
   })
   it('un integrante no puede crear invitaciones ni cambiar el negocio', async () => {
     const r = await B.rpc('create_invite', { p_workspace: workspace })

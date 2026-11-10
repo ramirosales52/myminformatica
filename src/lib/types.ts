@@ -77,6 +77,19 @@ export interface AppointmentService {
   price_cents: number
   duration_minutes: number
 }
+export interface ScheduledAppointment {
+  id: string
+  workspace_id: string
+  reference: string
+  starts_at: string
+  duration_minutes: number
+  status: Status
+  responsible_id: string
+  customer_name: string
+  responsible_name: string
+  workspace_name: string
+  services: { service_id: string; name: string }[]
+}
 export interface Payment {
   id: string
   workspace_id: string
