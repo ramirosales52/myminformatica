@@ -9,7 +9,7 @@ Se priorizó Vite, como pide la arquitectura original; **no es Next.js**. No hab
 - Implementación funcional con Supabase Auth, PostgreSQL, RLS, Realtime y Storage privado, verificada contra una instancia **local real y aislada**, sin mocks.
 - **Desplegado en producción**: [myminformatica.vercel.app](https://myminformatica.vercel.app) sobre el proyecto Supabase `zycuhuyrzednjowjlnae` (región `sa-east-1`), con las migraciones aplicadas y los datos locales migrados.
 - Las cuentas y registros de prueba se eliminan al terminar. No se entregan clientes, turnos ni ingresos ficticios.
-- Al crear el espacio se inicializan el catálogo y las plantillas solicitadas. Los precios iniciales son **0 y deben configurarse** antes de presupuestar.
+- Al iniciar el negocio por primera vez se inicializan el catálogo y las plantillas solicitadas. Los precios iniciales son **0 y deben configurarse** antes de presupuestar.
 
 ## Funcionalidades
 
@@ -17,11 +17,11 @@ Inicio; agenda diaria, semanal y mensual; clientes e historial; catálogo; mensa
 
 Turnos con múltiples servicios, precio/duración personalizados, responsable, control de superposiciones, estados, reprogramaciones auditadas y eliminación lógica. Anticipos, pagos parciales, devoluciones y correcciones inmutables. Comprobantes PNG/PDF y enlaces firmados temporales para WhatsApp.
 
-**Agenda global con operación libre:** cualquier usuario con sesión iniciada puede crear, editar, reasignar, reprogramar, cambiar de estado y eliminar turnos de cualquier espacio, sin invitación ni membresía. También puede consultar cliente, notas, precios e historial; registrar cobros, devoluciones y correcciones; y generar o compartir comprobantes. El formulario y el comprobante siempre usan el espacio original del turno, no el espacio seleccionado en la pantalla. Cualquier usuario registrado puede ser responsable. La eliminación sigue siendo lógica y conserva cobros e historial; se mantienen las validaciones de saldo, superposiciones, idempotencia y versiones concurrentes. Los cambios se sincronizan por Realtime con reconciliación cada 15 segundos. No hay acceso sin sesión.
+**Agenda global con operación libre:** cualquier usuario con sesión iniciada puede crear, editar, reasignar, reprogramar, cambiar de estado y eliminar turnos, sin invitación ni membresía. También puede consultar cliente, notas, precios e historial; registrar cobros, devoluciones y correcciones; y generar o compartir comprobantes. Los turnos existentes conservan su procedencia interna y los datos comerciales originales del comprobante. Cualquier usuario registrado puede ser responsable. La eliminación sigue siendo lógica y conserva cobros e historial; se mantienen las validaciones de saldo, superposiciones, idempotencia y versiones concurrentes. Los cambios se sincronizan por Realtime con reconciliación cada 15 segundos. No hay acceso sin sesión.
 
-**Clientes globales y teléfono opcional:** todos los usuarios autenticados ven la misma lista de clientes y pueden crearlos, editarlos y eliminarlos sin membresía. El teléfono se puede dejar vacío tanto al registrar un cliente como al agendar; varios clientes pueden no tener teléfono. WhatsApp solo se habilita con un número registrado; los comprobantes se pueden descargar sin teléfono. Eliminar un cliente lo quita de la lista y de nuevas selecciones, pero conserva sus turnos, cobros e historial. Al elegir un cliente de otro espacio para un turno nuevo, el formulario usa el catálogo de ese espacio.
+**Clientes globales y teléfono opcional:** todos los usuarios autenticados ven la misma lista de clientes y pueden crearlos, editarlos y eliminarlos sin membresía. El teléfono se puede dejar vacío tanto al registrar un cliente como al agendar; varios clientes pueden no tener teléfono. WhatsApp solo se habilita con un número registrado; los comprobantes se pueden descargar sin teléfono. Eliminar un cliente lo quita de la lista y de nuevas selecciones, pero conserva sus turnos, cobros e historial. El catálogo compartido está disponible al agendar para cualquier cliente.
 
-Para habilitar estas funcionalidades en una instalación existente, aplicá las migraciones pendientes de `supabase/migrations/`, incluida `20261110163359_optional_phone_shared_customers.sql`, antes de desplegar el frontend actualizado. Este cambio no agrega integrantes ni concede administración: el negocio, las invitaciones y las plantillas conservan permisos por espacio.
+**Negocio único compartido:** aplicá las migraciones pendientes, incluida `20261110210235_single_shared_business.sql`, antes de desplegar el frontend actualizado. Todas las cuentas registradas comparten clientes, servicios, turnos, pagos, reportes, historial y plantillas, sin crear ni elegir espacios. Los identificadores históricos se conservan sin mover ni borrar filas. Los nuevos registros usan el negocio más antiguo. Los administradores existentes mantienen la configuración del negocio; no se conceden roles nuevos. Las notificaciones personales no se comparten.
 
 ## 1. Ejecutar con Supabase local
 
@@ -47,7 +47,7 @@ En el entorno de esta entrega ya existe un `.env.local`, ignorado por Git, apunt
 npm run dev
 ```
 
-Abrí **http://localhost:5173** y creá tu cuenta para operar la agenda global. Si todavía no existe ningún espacio, creá el primero desde Ajustes. Las invitaciones solo son necesarias para acceder al equipo y a su administración, no para operar turnos. La confirmación por correo está desactivada **solo en la configuración local**. Se usa Auth real, no un login simulado.
+Abrí **http://localhost:5173** y creá tu cuenta. El negocio se conecta automáticamente y todas las cuentas comparten sus datos, sin invitaciones. La confirmación por correo está desactivada **solo en la configuración local**. Se usa Auth real, no un login simulado.
 
 Para detener solo esta instancia: `npx supabase@2.116.0 stop`. No uses `db reset` en una base con trabajo real.
 
@@ -80,15 +80,13 @@ Alternativa: ejecutar los SQL en orden en el SQL Editor. No mezcles métodos sin
 9. Comprobá que `receipts` sea un bucket **privado**. La migración configura RLS, límite de 10 MB y tipos permitidos.
 10. Revisá los asesores de seguridad y que todas las tablas propias tengan RLS.
 
-## 3. Crear las dos cuentas y compartir el espacio
+## 3. Crear las cuentas del equipo
 
-1. A usa **Crear cuenta**, confirma email si corresponde y crea el espacio.
-2. En **Ajustes → Espacio de trabajo**, configura negocio y crea una **invitación segura**.
-3. Comparte el enlace por un canal privado. Vence en **7 días**, tiene un único uso y la base guarda solo su hash.
-4. B abre el enlace, crea su **propia cuenta** e ingresa. En **Tengo una invitación** pega el enlace/código si hace falta. Ya comparten todos los módulos.
-5. Si B tenía otro espacio, también puede aceptar una invitación. El espacio activo se cambia desde Ajustes.
-6. A es administrador; B es integrante. Ambos administran la operación diaria. Solo administradores cambian el negocio, invitan y revocan accesos. Revocar no borra autoría.
-7. Cada persona modifica nombre, teléfono y contraseña en **Mi perfil**. El encabezado muestra **Agenda de [nombre]**; el nombre comercial del comprobante es independiente.
+1. Cada persona usa **Crear cuenta** y confirma su email si corresponde.
+2. Todas las cuentas acceden automáticamente al mismo negocio y ven todos sus datos operativos.
+3. En una instalación nueva, la primera cuenta inicializa el negocio y es administradora. En instalaciones existentes se conservan los roles administrativos.
+4. Solo administradores cambian la configuración desde **Ajustes → Negocio y equipo**. Quitar una membresía histórica no revoca el acceso global: para bloquear una cuenta hay que gestionar su acceso en Auth.
+5. Cada persona modifica nombre, teléfono y contraseña en **Mi perfil**. El nombre comercial del comprobante es independiente.
 
 No compartan contraseñas ni credenciales de administración de Supabase entre operadores.
 

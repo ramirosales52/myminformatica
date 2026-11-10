@@ -75,7 +75,7 @@ export function AppointmentList({
                 </span>
                 <small>
                   <Clock3 size={12} />
-                  {duration(a.duration_minutes)} · {summary?.workspace_name ?? 'Remoto'}
+                  {duration(a.duration_minutes)} · Remoto
                 </small>
               </div>
               <div className="appointment-state">

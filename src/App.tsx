@@ -40,7 +40,7 @@ import { AppointmentForm } from './components/AppointmentForm'
 import { CustomerForm } from './components/CustomerForm'
 import { PaymentForm } from './components/PaymentForm'
 import { Button, Empty } from './components/ui'
-import { AuthPage, Brand, WorkspaceOnboarding } from './pages/Auth'
+import { AuthPage, Brand } from './pages/Auth'
 import { Dashboard } from './pages/Dashboard'
 import { Agenda } from './pages/Agenda'
 import { Customers, CustomerDetails } from './pages/Customers'
@@ -95,7 +95,6 @@ export default function App() {
         </div>
       </main>
     )
-  if (session && window.location.hash.includes('invitation=')) return <WorkspaceOnboarding />
   return <WorkspaceApp key={workspace?.id ?? 'unconfigured'} />
 }
 function WorkspaceApp() {
@@ -169,7 +168,7 @@ function WorkspaceApp() {
   function requireConnection() {
     if (!workspace || !session) {
       navigate('settings')
-      notify('Creá un espacio de trabajo o aceptá una invitación para guardar información.')
+      notify('Esperá a que se conecte el negocio para guardar información.')
       setSettingsTab('workspace')
       return false
     }
@@ -269,11 +268,11 @@ function WorkspaceApp() {
             <Layers3 size={15} />
           </span>
           <div>
-            <strong>{workspace?.name ?? 'Tu espacio de trabajo'}</strong>
+            <strong>{workspace?.name ?? 'Tu negocio'}</strong>
           </div>
           <button
             className="icon-btn"
-            aria-label="Configurar espacio de trabajo"
+            aria-label="Configurar negocio"
             onClick={() => navigate('settings')}
           >
             <ChevronDown size={14} />
