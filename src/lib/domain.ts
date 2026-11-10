@@ -1,6 +1,14 @@
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz'
 import { es } from 'date-fns/locale'
-import { addDays, addMonths, endOfMonth, format, startOfMonth, startOfWeek } from 'date-fns'
+import {
+  addDays,
+  addMinutes,
+  addMonths,
+  endOfMonth,
+  format,
+  startOfMonth,
+  startOfWeek,
+} from 'date-fns'
 import type { Appointment, AppointmentService, Currency, Payment } from './types'
 
 export const TIMEZONE = 'America/Argentina/Cordoba'
@@ -9,6 +17,38 @@ export const zoned = (date: string | Date, pattern = 'dd MMM yyyy') =>
 export const today = () => zoned(new Date(), 'yyyy-MM-dd')
 export const localInput = (date: string | Date) => zoned(date, "yyyy-MM-dd'T'HH:mm")
 export const toUTC = (dateTime: string) => fromZonedTime(dateTime, TIMEZONE).toISOString()
+
+// Diferencia horaria manual del cliente respecto de Argentina, en minutos.
+// El código telefónico no indica dónde está la persona, así que se carga a mano por cliente.
+// Argentina no cambia de horario de verano, corregir el instante y formatearlo acá da la
+// hora de pared exacta que el cliente ve en su país. Sin null o 0 no hay corrección.
+export function toOffsetMinutes(value: string) {
+  const normalized = value.trim().replace(',', '.')
+  if (!normalized) return null
+  if (!/^[+-]?\d+(\.\d{1,2})?$/.test(normalized))
+    throw new Error('Ingresá la diferencia en horas respecto de Argentina, por ejemplo -2 o 4,5.')
+  const minutes = Math.round(Number(normalized) * 60)
+  if (minutes === 0) return null
+  if (Math.abs(minutes) > 17 * 60)
+    throw new Error('La diferencia horaria admite hasta ±17 horas respecto de Argentina.')
+  return minutes
+}
+export const shifted = (date: string | Date, minutes?: number | null) =>
+  minutes ? addMinutes(new Date(date), minutes) : new Date(date)
+export const utcOffsetLabel = (minutes?: number | null) => {
+  const total = -180 + (minutes ?? 0)
+  if (total === 0) return 'UTC'
+  const sign = total < 0 ? '\u2212' : '+'
+  const abs = Math.abs(total)
+  const hours = Math.floor(abs / 60)
+  return `UTC${sign}${hours}${abs % 60 ? `:${String(abs % 60).padStart(2, '0')}` : ''}`
+}
+export function customerSchedule(date: string, minutes?: number | null) {
+  const yours = zoned(shifted(date, minutes), "dd/MM/yyyy 'a las' HH:mm")
+  return minutes
+    ? `${yours} (hora de tu país) · Argentina: ${zoned(date, "dd/MM/yyyy 'a las' HH:mm")}`
+    : `${yours} (Argentina)`
+}
 export const dateObject = (day: string) => new Date(`${day}T12:00:00`)
 export const shiftDay = (day: string, n: number) =>
   format(addDays(dateObject(day), n), 'yyyy-MM-dd')

@@ -14,12 +14,15 @@ import { useData } from '../providers/DataProvider'
 import { useToast } from '../providers/ToastProvider'
 import { db, messageFor } from '../lib/supabase'
 import {
+  customerSchedule,
   downloadFile,
   duration,
   money,
   paidFor,
   PAYMENT_STATUS,
   paymentState,
+  shifted,
+  utcOffsetLabel,
   whatsappUrl,
   zoned,
 } from '../lib/domain'
@@ -45,15 +48,23 @@ export function Receipt({
   const [snapshot] = useState(() => ({
     appointment: latestAppointment,
     workspace: latestWorkspace,
-    customer: data.customers.find(c => c.id === latestAppointment.customer_id),
+    customer: data.customers.find((c) => c.id === latestAppointment.customer_id),
     paid: paidFor(latestAppointment.id, data.payments),
-    lines: data.appointmentServices.filter(s => s.appointment_id === latestAppointment.id),
+    lines: data.appointmentServices.filter((s) => s.appointment_id === latestAppointment.id),
     generatedAt: new Date().toISOString(),
   }))
   const { appointment, workspace, customer, paid, lines, generatedAt } = snapshot
-  const stale = latestAppointment.version !== appointment.version || latestWorkspace?.version !== workspace?.version || paidFor(appointment.id,data.payments) !== paid || data.customers.find(c => c.id === appointment.customer_id)?.version !== customer?.version
+  // El comprobante se lee en el país del cliente; la diferencia se carga a mano en el cliente.
+  const offset = customer?.tz_offset_minutes ?? null
+  const stale =
+    latestAppointment.version !== appointment.version ||
+    latestWorkspace?.version !== workspace?.version ||
+    paidFor(appointment.id, data.payments) !== paid ||
+    data.customers.find((c) => c.id === appointment.customer_id)?.version !== customer?.version
   const staleRef = useRef(stale)
-  useEffect(() => { staleRef.current = stale },[stale])
+  useEffect(() => {
+    staleRef.current = stale
+  }, [stale])
   const cachedPng = useRef<Promise<string> | null>(null)
   const state = paymentState(appointment.total_cents, paid)
   const titles = {
@@ -68,9 +79,15 @@ export function Receipt({
       cachedPng.current = (async () => {
         const { toPng } = await import('html-to-image')
         await document.fonts.ready
-        return toPng(ref.current!, { pixelRatio: 2, backgroundColor: '#101a2c', preferredFontFormat: 'woff2' })
+        return toPng(ref.current!, {
+          pixelRatio: 2,
+          backgroundColor: '#101a2c',
+          preferredFontFormat: 'woff2',
+        })
       })()
-      void cachedPng.current.catch(() => { cachedPng.current = null })
+      void cachedPng.current.catch(() => {
+        cachedPng.current = null
+      })
     }
     return cachedPng.current
   }
@@ -78,7 +95,10 @@ export function Receipt({
     setBusy(true)
     try {
       const image = await png()
-      if (staleRef.current) throw new Error('El turno cambió. Cerrá y volvé a abrir el comprobante para usar los datos actuales.')
+      if (staleRef.current)
+        throw new Error(
+          'El turno cambió. Cerrá y volvé a abrir el comprobante para usar los datos actuales.',
+        )
       const blob = await (await fetch(image)).blob()
       if (format === 'png') downloadFile(blob, `${appointment.reference}.png`)
       else if (format === 'pdf') {
@@ -105,7 +125,7 @@ export function Receipt({
         setLink(
           whatsappUrl(
             customer.phone,
-            `¡Hola ${customer.full_name}! 👋\n${titles[appointment.status]}\n📅 ${zoned(appointment.starts_at, "dd/MM/yyyy 'a las' HH:mm")} (Argentina)\n${lines.map((l) => l.name).join(' + ')}\nTotal: ${money(appointment.total_cents, appointment.currency)}\nAbonado: ${money(paid, appointment.currency)}\nSaldo: ${money(Math.max(0, appointment.total_cents - paid), appointment.currency)}\n\nTu comprobante (enlace válido por 1 hora):\n${signed.data.signedUrl}`,
+            `¡Hola ${customer.full_name}! 👋\n${titles[appointment.status]}\n📅 ${customerSchedule(appointment.starts_at, customer.tz_offset_minutes)}\n${lines.map((l) => l.name).join(' + ')}\nTotal: ${money(appointment.total_cents, appointment.currency)}\nAbonado: ${money(paid, appointment.currency)}\nSaldo: ${money(Math.max(0, appointment.total_cents - paid), appointment.currency)}\n\nTu comprobante (enlace válido por 1 hora):\n${signed.data.signedUrl}`,
           ),
         )
         notify('Enlace temporal listo. Abrí WhatsApp para confirmar el envío.')
@@ -139,7 +159,12 @@ export function Receipt({
       onClose={onClose}
       busy={busy}
     >
-      {stale ? <p className="warning">El turno, el cliente o sus cobros cambiaron. Cerrá y volvé a abrir este comprobante para generar una versión actualizada.</p> : null}
+      {stale ? (
+        <p className="warning">
+          El turno, el cliente o sus cobros cambiaron. Cerrá y volvé a abrir este comprobante para
+          generar una versión actualizada.
+        </p>
+      ) : null}
       <div className="receipt-scroll">
         <div ref={ref} className="receipt">
           <div className="receipt-brand">
@@ -168,12 +193,12 @@ export function Receipt({
           </div>
           <div className="receipt-grid">
             <div>
-              <small>Fecha</small>
-              <strong>{zoned(appointment.starts_at, 'dd/MM/yyyy')}</strong>
+              <small>{offset ? 'Fecha en tu país' : 'Fecha'}</small>
+              <strong>{zoned(shifted(appointment.starts_at, offset), 'dd/MM/yyyy')}</strong>
             </div>
             <div>
-              <small>Horario</small>
-              <strong>{zoned(appointment.starts_at, 'HH:mm')} h</strong>
+              <small>{offset ? 'Horario en tu país' : 'Horario'}</small>
+              <strong>{zoned(shifted(appointment.starts_at, offset), 'HH:mm')} h</strong>
             </div>
             <div>
               <small>Modalidad</small>
@@ -184,6 +209,12 @@ export function Receipt({
               <strong>{duration(appointment.duration_minutes)}</strong>
             </div>
           </div>
+          {offset ? (
+            <p className="receipt-zone-note">
+              Argentina: {zoned(appointment.starts_at, 'dd/MM/yyyy HH:mm')} h (UTC−3) · Tu horario:{' '}
+              {utcOffsetLabel(offset)}
+            </p>
+          ) : null}
           <div className="receipt-services">
             <small>SERVICIOS ACORDADOS</small>
             {lines.map((l, i) => (
@@ -210,11 +241,15 @@ export function Receipt({
             </p>
           </div>
           <div className="receipt-footer">
-            <p>Datos al {zoned(generatedAt,'dd/MM/yyyy HH:mm')} (Argentina)</p>
+            <p>Datos al {zoned(generatedAt, 'dd/MM/yyyy HH:mm')} (Argentina)</p>
             <span>
               {STATUS[appointment.status]} · {PAYMENT_STATUS[state]}
             </span>
-            <p>Zona horaria: America/Argentina/Cordoba (UTC−3)</p>
+            <p>
+              {offset
+                ? `Tu horario: ${utcOffsetLabel(offset)} · Argentina: UTC−3`
+                : 'Zona horaria: Argentina (UTC−3)'}
+            </p>
             <p>Comprobante de coordinación y pago. No es una factura fiscal.</p>
             {workspace?.business_phone || workspace?.business_email ? (
               <p>
@@ -225,11 +260,21 @@ export function Receipt({
         </div>
       </div>
       <div className="quick-amounts mt-5">
-        <Button variant="secondary" onClick={() => void generate('png')} loading={busy} disabled={stale}>
+        <Button
+          variant="secondary"
+          onClick={() => void generate('png')}
+          loading={busy}
+          disabled={stale}
+        >
           <Download size={16} />
           Descargar PNG
         </Button>
-        <Button variant="secondary" onClick={() => void generate('pdf')} loading={busy} disabled={stale}>
+        <Button
+          variant="secondary"
+          onClick={() => void generate('pdf')}
+          loading={busy}
+          disabled={stale}
+        >
           <FileText size={16} />
           Descargar PDF
         </Button>
@@ -246,15 +291,17 @@ export function Receipt({
         </label>
         {link ? (
           <>
-            {!stale ? <a
-              className="btn btn-primary full"
-              href={link}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <MessageCircle size={17} />
-              Abrir WhatsApp y confirmar envío
-            </a> : null}
+            {!stale ? (
+              <a
+                className="btn btn-primary full"
+                href={link}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <MessageCircle size={17} />
+                Abrir WhatsApp y confirmar envío
+              </a>
+            ) : null}
             <Button className="full" variant="ghost" onClick={() => void revoke()} loading={busy}>
               Revocar enlace compartido
             </Button>

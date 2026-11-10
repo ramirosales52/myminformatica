@@ -10,7 +10,15 @@ import {
   UsersRound,
 } from 'lucide-react'
 import { useData } from '../providers/DataProvider'
-import { initials, money, paidFor, signedAmount, whatsappUrl, zoned } from '../lib/domain'
+import {
+  initials,
+  money,
+  paidFor,
+  signedAmount,
+  utcOffsetLabel,
+  whatsappUrl,
+  zoned,
+} from '../lib/domain'
 import type { Customer } from '../lib/types'
 import { AppointmentList } from '../components/AppointmentList'
 import { Button, Empty, Modal, PageHeading } from '../components/ui'
@@ -229,6 +237,12 @@ export function CustomerDetails({
           </div>
         ))}
       </div>
+      {customer.tz_offset_minutes ? (
+        <p className="muted small">
+          Diferencia horaria con Argentina: {customer.tz_offset_minutes / 60} h · Su hora:{' '}
+          {utcOffsetLabel(customer.tz_offset_minutes)}
+        </p>
+      ) : null}
       {customer.notes ? (
         <div className="notes-box">
           <small>Notas del cliente</small>

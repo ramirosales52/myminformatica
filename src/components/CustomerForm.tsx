@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import { useData } from '../providers/DataProvider'
 import { useToast } from '../providers/ToastProvider'
 import { db, messageFor } from '../lib/supabase'
-import { normalizePhone } from '../lib/domain'
+import { normalizePhone, toOffsetMinutes } from '../lib/domain'
 import type { Customer } from '../lib/types'
 import { Button, Field, Modal } from './ui'
 
@@ -21,6 +21,9 @@ export function CustomerForm({
   const [name, setName] = useState(customer?.full_name ?? '')
   const [phone, setPhone] = useState(customer?.phone ?? '')
   const [code, setCode] = useState(customer?.country_code ?? '+54')
+  const [offset, setOffset] = useState(
+    customer?.tz_offset_minutes ? String(customer.tz_offset_minutes / 60) : '',
+  )
   const [notes, setNotes] = useState(customer?.notes ?? '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -34,6 +37,7 @@ export function CustomerForm({
         full_name: name.trim(),
         phone: normalizePhone(phone, code),
         country_code: code,
+        tz_offset_minutes: toOffsetMinutes(offset),
         notes,
       }
       const request = customer
@@ -98,6 +102,19 @@ export function CustomerForm({
             />
           </Field>
         </div>
+        <Field
+          label="Diferencia horaria con Argentina"
+          hint="En horas: Colombia −2, España +4, México −3. Dejalo vacío si está en Argentina."
+        >
+          <input
+            inputMode="numeric"
+            type="number"
+            step="0.5"
+            value={offset}
+            onChange={(e) => setOffset(e.target.value)}
+            placeholder="0"
+          />
+        </Field>
         <Field label="Notas del cliente">
           <textarea
             rows={3}

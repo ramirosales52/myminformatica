@@ -11,7 +11,7 @@
 - Bloqueo del espacio de trabajo para editar agenda y comprobar superposiciones; bloqueo del turno para cobrar. Versionado optimista evita sobrescribir ediciones concurrentes. UUID de solicitud evita repetir altas y cobros al reintentar.
 - Los movimientos económicos son inmutables. Una corrección agrega un movimiento compensatorio. La eliminación de un turno es lógica y no elimina sus cobros ni su historial.
 - Los servicios del turno son instantáneas de nombre, precio y duración. Modificar el catálogo no cambia lo acordado.
-- Fechas persistidas como `timestamptz`, interpretación y filtros con `America/Argentina/Cordoba`.
+- Fechas persistidas como `timestamptz`, interpretación y filtros con `America/Argentina/Cordoba`. Los comprobantes pueden mostrarse en la hora del país del cliente con la diferencia horaria que se carga a mano en su ficha; sin APIs externas.
 - Los comprobantes se generan en el dispositivo. Para compartir se carga un PNG a un bucket privado y se genera un enlace firmado de una hora, con confirmación explícita. WhatsApp siempre requiere que el operador confirme el envío.
 
 ## Estructura

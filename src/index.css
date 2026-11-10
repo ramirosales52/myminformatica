@@ -3465,6 +3465,11 @@ tbody > tr:hover {
   color: #b4cbed;
   margin-top: 7px;
 }
+.receipt-zone-note {
+  margin: -14px 0 16px;
+  font-size: 8px;
+  color: #7c99c4;
+}
 .receipt-services {
   border-top: 1px solid #273b56;
   border-bottom: 1px solid #273b56;

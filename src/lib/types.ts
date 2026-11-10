@@ -32,6 +32,7 @@ export interface Customer {
   full_name: string
   phone: string
   country_code: string
+  tz_offset_minutes: number | null
   notes: string
   created_at: string
   version: number

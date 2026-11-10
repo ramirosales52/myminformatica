@@ -1,16 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import {
   csvValue,
+  customerSchedule,
   fillTemplate,
   inRange,
   money,
   normalizePhone,
   paidFor,
   paymentState,
+  shifted,
   signedAmount,
   toCents,
+  toOffsetMinutes,
   totals,
   toUTC,
+  utcOffsetLabel,
   whatsappUrl,
   zoned,
 } from '../src/lib/domain'
@@ -118,5 +122,38 @@ describe('Argentina, WhatsApp y exportación segura', () => {
   it('neutraliza fórmulas en CSV y escapa comillas', () => {
     expect(csvValue('=HYPERLINK("x")')).toBe('"\'=HYPERLINK(""x"")"')
     expect(csvValue('texto;\n"')).toBe('"texto;\n"""')
+  })
+})
+describe('Hora del país del cliente en comprobantes', () => {
+  // 20:00 UTC = 17:00 en Argentina. Con la diferencia manual de Colombia (−2 h) son las 15:00.
+  const instant = '2026-11-09T20:00:00Z'
+  it('carga la diferencia horaria a mano, con coma o punto, y vacío significa Argentina', () => {
+    expect(toOffsetMinutes('-2')).toBe(-120)
+    expect(toOffsetMinutes('+4')).toBe(240)
+    expect(toOffsetMinutes('4,5')).toBe(270)
+    expect(toOffsetMinutes('')).toBeNull()
+    expect(toOffsetMinutes('0')).toBeNull()
+    expect(() => toOffsetMinutes('mañana')).toThrow()
+    expect(() => toOffsetMinutes('20')).toThrow()
+  })
+  it('corrige el instante por la diferencia del cliente, no por el código telefónico', () => {
+    expect(zoned(shifted(instant, -120), 'HH:mm')).toBe('15:00')
+    expect(zoned(shifted(instant, 240), 'HH:mm')).toBe('21:00')
+    expect(zoned(shifted(instant, null), 'HH:mm')).toBe('17:00')
+    // Un turno de madrugada cambia de día para el cliente.
+    expect(zoned(shifted(instant, 600), 'dd/MM/yyyy HH:mm')).toBe('10/11/2026 03:00')
+  })
+  it('etiqueta la hora del cliente a partir de la diferencia', () => {
+    expect(utcOffsetLabel(-120)).toBe('UTC\u22125')
+    expect(utcOffsetLabel(240)).toBe('UTC+1')
+    expect(utcOffsetLabel(510)).toBe('UTC+5:30')
+    expect(utcOffsetLabel(180)).toBe('UTC')
+    expect(utcOffsetLabel(null)).toBe('UTC\u22123')
+  })
+  it('arma el horario del mensaje con la hora del cliente y la de Argentina', () => {
+    expect(customerSchedule(instant, -120)).toBe(
+      '09/11/2026 a las 15:00 (hora de tu país) · Argentina: 09/11/2026 a las 17:00',
+    )
+    expect(customerSchedule(instant, null)).toBe('09/11/2026 a las 17:00 (Argentina)')
   })
 })
