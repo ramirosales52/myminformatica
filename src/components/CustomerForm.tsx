@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import { useData } from '../providers/DataProvider'
 import { useToast } from '../providers/ToastProvider'
 import { db, messageFor } from '../lib/supabase'
-import { normalizePhone } from '../lib/domain'
+import { normalizeOptionalPhone } from '../lib/domain'
 import type { Customer } from '../lib/types'
 import { Button, Field, Modal } from './ui'
 
@@ -32,7 +32,7 @@ export function CustomerForm({
       if (!workspace) throw new Error('Conectá tu espacio de trabajo antes de guardar.')
       const values = {
         full_name: name.trim(),
-        phone: normalizePhone(phone, code),
+        phone: normalizeOptionalPhone(phone, code),
         country_code: code,
         notes,
       }
@@ -85,13 +85,12 @@ export function CustomerForm({
             />
           </Field>
           <Field
-            label="WhatsApp"
-            hint="Usá el número internacional con + para no agregar el código dos veces."
+            label="WhatsApp (opcional)"
+            hint="Podés dejarlo vacío. Si lo ingresás, usá el número internacional con +."
           >
             <input
               autoComplete="tel"
               type="tel"
-              required
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="+54 9 351 123 4567"

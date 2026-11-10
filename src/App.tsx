@@ -230,8 +230,8 @@ function WorkspaceApp() {
         .slice(0, 4)
     : []
   const foundCustomers = needle
-    ? data.customers
-        .filter((c) => `${c.full_name} ${c.phone}`.toLowerCase().includes(needle))
+    ? appointmentData.customers
+        .filter((c) => !c.deleted_at && `${c.full_name} ${c.phone}`.toLowerCase().includes(needle))
         .slice(0, 3)
     : []
   const foundServices = needle
@@ -435,7 +435,7 @@ function WorkspaceApp() {
                       <UsersRound size={16} />
                       <span>
                         <strong>{c.full_name}</strong>
-                        <small>Cliente · {c.phone}</small>
+                        <small>Cliente · {c.phone || 'Sin teléfono'}</small>
                       </span>
                       <ArrowUpRight size={14} />
                     </button>
@@ -691,7 +691,10 @@ function WorkspaceApp() {
           <CustomerForm customer={overlay.customer} onClose={closeOverlay} />
         ) : overlay?.kind === 'customerDetails' ? (
           <CustomerDetails
-            customer={data.customers.find((c) => c.id === overlay.customer.id) ?? overlay.customer}
+            customer={
+              appointmentData.customers.find((c) => c.id === overlay.customer.id) ??
+              overlay.customer
+            }
             onClose={closeOverlay}
             onEdit={(customer) => setOverlay({ kind: 'customer', customer })}
             onNewAppointment={(customer) =>

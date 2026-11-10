@@ -111,6 +111,8 @@ export function Receipt({
         pdf.addImage(image, 'PNG', 10, 10, 190, height)
         pdf.save(`${appointment.reference}.pdf`)
       } else {
+        if (!customer?.phone)
+          throw new Error('Agregá un teléfono al cliente para compartir por WhatsApp.')
         if (!workspace || !customer || !consent)
           throw new Error(
             'Confirmá que querés compartir este comprobante mediante un enlace temporal.',
@@ -312,13 +314,17 @@ export function Receipt({
             className="full"
             onClick={() => void generate('share')}
             loading={busy}
-            disabled={!consent || stale}
+            disabled={!consent || stale || !customer?.phone}
           >
             <Link2 size={16} />
             Preparar comprobante para WhatsApp
           </Button>
         )}
-        <small>No se envían mensajes automáticamente.</small>
+        <small>
+          {customer?.phone
+            ? 'No se envían mensajes automáticamente.'
+            : 'Sin teléfono: podés descargar el comprobante en PNG o PDF.'}
+        </small>
       </div>
     </Modal>
   )

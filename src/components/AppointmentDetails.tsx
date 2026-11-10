@@ -163,7 +163,7 @@ export function AppointmentDetails({
           <FileCheck2 size={16} />
           Comprobante
         </Button>
-        {customer ? (
+        {customer?.phone ? (
           <a
             className="btn btn-secondary"
             href={whatsappUrl(
@@ -207,7 +207,7 @@ export function AppointmentDetails({
         </div>
         <div>
           <small>WhatsApp del cliente</small>
-          <p>{customer?.phone ?? 'Sin teléfono'}</p>
+          <p>{customer?.phone || 'Sin teléfono'}</p>
         </div>
       </div>
       {a.notes ? (

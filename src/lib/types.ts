@@ -36,6 +36,7 @@ export interface Customer {
   notes: string
   created_at: string
   version: number
+  deleted_at: string | null
 }
 export interface Service {
   id: string

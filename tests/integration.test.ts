@@ -330,6 +330,71 @@ describe('Supabase real: seguridad, dinero y sincronización', () => {
     const global = await rpc<ScheduledAppointment[]>(C, 'global_schedule', {})
     expect(global.find((a) => a.id === appointment)?.status).toBe('confirmed')
   })
+  it('cualquier usuario registra varios clientes sin teléfono, agenda, edita y elimina sin membresía', async () => {
+    const ids: string[] = []
+    for (const values of [{}, { phone: '' }]) {
+      const created = await D.from('customers')
+        .insert({
+          workspace_id: workspace,
+          full_name: 'Cliente sin teléfono',
+          ...values,
+        })
+        .select()
+        .single()
+      expect(created.error).toBeNull()
+      expect(created.data!.phone).toBe('')
+      ids.push(created.data!.id)
+    }
+    const edited = await C.from('customers')
+      .update({ full_name: 'Editado globalmente', notes: 'Compartido' })
+      .eq('id', ids[0])
+      .eq('version', 1)
+      .select()
+      .single()
+    expect(edited.error).toBeNull()
+    expect(edited.data!.version).toBe(2)
+    const stale = await B.from('customers')
+      .update({ full_name: 'Obsoleto' })
+      .eq('id', ids[0])
+      .eq('version', 1)
+      .select()
+      .single()
+    expect(stale.error).not.toBeNull()
+    const id = await rpc(D, 'save_appointment', {
+      p_workspace: workspace,
+      p_request_id: crypto.randomUUID(),
+      p_payload: { ...payload, customer_id: ids[0], starts_at: later(18) },
+    })
+    const deleted = await B.from('customers')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', ids[0])
+      .eq('version', 2)
+      .select()
+      .single()
+    expect(deleted.error).toBeNull()
+    expect(deleted.data!.deleted_at).toBeTruthy()
+    const retained = await D.from('appointments')
+      .select('customer_id,deleted_at')
+      .eq('id', id)
+      .single()
+    expect(retained.data).toEqual({ customer_id: ids[0], deleted_at: null })
+    const anonymous = client()
+    expect((await anonymous.from('customers').select('*')).data ?? []).toHaveLength(0)
+    expect(
+      (await anonymous.from('customers').insert({ workspace_id: workspace, full_name: 'Anónimo' }))
+        .error,
+    ).not.toBeNull()
+    expect(
+      (await anonymous.from('customers').update({ full_name: 'No autorizado' }).eq('id', ids[1]))
+        .error,
+    ).not.toBeNull()
+    const invalid = await D.from('customers').insert({
+      workspace_id: workspace,
+      full_name: 'Inválido',
+      phone: '123',
+    })
+    expect(invalid.error?.code).toBe('23514')
+  })
   it('bloquea una edición obsoleta sin sobrescribir cambios', async () => {
     const r = await A.rpc('save_appointment', {
       p_workspace: workspace,

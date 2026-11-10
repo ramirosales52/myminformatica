@@ -6,10 +6,13 @@ import {
   Pencil,
   Plus,
   Search,
+  Trash2,
   UserRound,
   UsersRound,
 } from 'lucide-react'
 import { useData } from '../providers/DataProvider'
+import { useToast } from '../providers/ToastProvider'
+import { db, messageFor } from '../lib/supabase'
 import { initials, money, paidFor, signedAmount, whatsappUrl, zoned } from '../lib/domain'
 import type { Customer } from '../lib/types'
 import { AppointmentList } from '../components/AppointmentList'
@@ -24,9 +27,10 @@ export function Customers({
   onSelect: (c: Customer) => void
   initialSearch?: string
 }) {
-  const { data } = useData()
+  const { appointmentData: data } = useData()
   const [search, setSearch] = useState(initialSearch)
   const customers = data.customers
+    .filter((c) => !c.deleted_at)
     .filter((c) =>
       `${c.full_name} ${c.phone} ${c.notes}`.toLowerCase().includes(search.toLowerCase()),
     )
@@ -47,7 +51,7 @@ export function Customers({
       <div className="catalog-summary">
         <span>
           <UsersRound size={19} />
-          <strong>{data.customers.length}</strong> clientes en tu espacio
+          <strong>{data.customers.filter((c) => !c.deleted_at).length}</strong> clientes en la app
         </span>
         <span>Una base compartida por todo el equipo</span>
       </div>
@@ -74,9 +78,7 @@ export function Customers({
                   <th>Trabajos</th>
                   <th>Cliente desde</th>
                   <th>Saldo pendiente</th>
-                  <th>
-                    <span className="sr-only">Acciones</span>
-                  </th>
+                  <th aria-label="Acciones" />
                 </tr>
               </thead>
               <tbody>
@@ -102,15 +104,19 @@ export function Customers({
                         </button>
                       </td>
                       <td>
-                        <a
-                          className="muted-link"
-                          href={whatsappUrl(c.phone, `¡Hola ${c.full_name}!`)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <MessageCircle size={14} />
-                          {c.phone}
-                        </a>
+                        {c.phone ? (
+                          <a
+                            className="muted-link"
+                            href={whatsappUrl(c.phone, `¡Hola ${c.full_name}!`)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <MessageCircle size={14} />
+                            {c.phone}
+                          </a>
+                        ) : (
+                          <span className="muted">Sin teléfono</span>
+                        )}
                       </td>
                       <td>{appointments.length}</td>
                       <td>{zoned(c.created_at, 'dd MMM yyyy')}</td>
@@ -178,7 +184,35 @@ export function CustomerDetails({
   onNewAppointment: (c: Customer) => void
   onAppointment: (id: string) => void
 }) {
-  const { data } = useData()
+  const { appointmentData: data, refresh } = useData()
+  const notify = useToast()
+  const [busy, setBusy] = useState(false)
+  async function remove() {
+    if (
+      !window.confirm(
+        `¿Eliminar a ${customer.full_name}? Sus turnos y cobros se conservarán en el historial.`,
+      )
+    )
+      return
+    setBusy(true)
+    try {
+      const { error } = await db()
+        .from('customers')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', customer.id)
+        .eq('version', customer.version)
+        .select()
+        .single()
+      if (error) throw error
+      await refresh()
+      notify('Cliente eliminado.')
+      onClose()
+    } catch (err) {
+      notify(messageFor(err), true)
+    } finally {
+      setBusy(false)
+    }
+  }
   const appointments = data.appointments.filter((a) => a.customer_id === customer.id)
   const ids = new Set(appointments.map((a) => a.id))
   const balances = (['ARS', 'USD'] as const).map((currency) => ({
@@ -196,24 +230,33 @@ export function CustomerDetails({
       subtitle={`Cliente desde ${zoned(customer.created_at, 'dd MMMM yyyy')}`}
       onClose={onClose}
       wide
+      busy={busy}
     >
       <div className="customer-detail-actions">
-        <a
-          href={whatsappUrl(customer.phone, `¡Hola ${customer.full_name}!`)}
-          className="btn btn-secondary"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <MessageCircle size={16} />
-          {customer.phone}
-        </a>
-        <Button variant="secondary" onClick={() => onEdit(customer)}>
+        {customer.phone ? (
+          <a
+            href={whatsappUrl(customer.phone, `¡Hola ${customer.full_name}!`)}
+            className="btn btn-secondary"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <MessageCircle size={16} />
+            {customer.phone}
+          </a>
+        ) : (
+          <span className="muted">Sin teléfono</span>
+        )}
+        <Button variant="secondary" disabled={busy} onClick={() => onEdit(customer)}>
           <Pencil size={15} />
           Editar datos
         </Button>
-        <Button onClick={() => onNewAppointment(customer)}>
+        <Button disabled={busy} onClick={() => onNewAppointment(customer)}>
           <CalendarPlus size={16} />
           Nuevo turno
+        </Button>
+        <Button variant="secondary" loading={busy} onClick={() => void remove()}>
+          <Trash2 size={15} />
+          Eliminar cliente
         </Button>
       </div>
       <div className="customer-balances">

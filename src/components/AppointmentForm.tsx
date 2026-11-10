@@ -9,7 +9,7 @@ import {
   duration,
   endTime,
   money,
-  normalizePhone,
+  normalizeOptionalPhone,
   toCents,
   toOffsetMinutes,
   today,
@@ -34,8 +34,13 @@ export function AppointmentForm({
   onSaved?: (id: string) => void
 }) {
   const { appointmentData, workspace: selectedWorkspace, workspaces, refresh } = useData()
-  const workspace = appointment
-    ? workspaces.find((w) => w.id === appointment.workspace_id)
+  const [customerId, setCustomerId] = useState(appointment?.customer_id ?? initialCustomer ?? '')
+  const customerWorkspaceId = appointmentData.customers.find(
+    (c) => c.id === customerId,
+  )?.workspace_id
+  const targetWorkspaceId = appointment?.workspace_id ?? customerWorkspaceId
+  const workspace = targetWorkspaceId
+    ? workspaces.find((w) => w.id === targetWorkspaceId)
     : selectedWorkspace
   const data = {
     ...appointmentData,
@@ -45,7 +50,6 @@ export function AppointmentForm({
   }
   const { session } = useAuth()
   const notify = useToast()
-  const [customerId, setCustomerId] = useState(appointment?.customer_id ?? initialCustomer ?? '')
   const [newCustomer, setNewCustomer] = useState(false)
   const [offsetEdits, setOffsetEdits] = useState<Record<string, string>>({})
   const offsetKey = newCustomer ? 'new' : customerId
@@ -144,8 +148,9 @@ export function AppointmentForm({
       const offsetMinutes = toOffsetMinutes(offset)
       let customer = customerId
       if (newCustomer) {
-        const normalized = normalizePhone(phone, code)
-        const existing = data.customers.find((c) => c.phone === normalized)
+        const normalized = normalizeOptionalPhone(phone, code)
+        const existing =
+          normalized && data.customers.find((c) => c.phone === normalized && !c.deleted_at)
         if (existing)
           throw new Error(
             `Ese WhatsApp ya pertenece a ${existing.full_name}. Seleccionalo en clientes registrados.`,
@@ -276,10 +281,9 @@ export function AppointmentForm({
                   onChange={(e) => setCode(e.target.value)}
                 />
               </Field>
-              <Field label="WhatsApp">
+              <Field label="WhatsApp (opcional)">
                 <input
                   type="tel"
-                  required
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="+54 9 351…"
@@ -289,13 +293,26 @@ export function AppointmentForm({
           </div>
         ) : (
           <Field label="Cliente registrado">
-            <select required value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
+            <select
+              required
+              value={customerId}
+              onChange={(e) => {
+                const next = appointmentData.customers.find((c) => c.id === e.target.value)
+                if ((next?.workspace_id ?? selectedWorkspace?.id) !== workspace?.id) {
+                  setLines([])
+                  setAmount('0')
+                  setInitialPayment('0')
+                }
+                setCustomerId(e.target.value)
+              }}
+            >
               <option value="">Seleccionar cliente…</option>
-              {data.customers
+              {(appointment ? data.customers : appointmentData.customers)
+                .filter((c) => !c.deleted_at || c.id === appointment?.customer_id)
                 .toSorted((a, b) => a.full_name.localeCompare(b.full_name))
                 .map((c) => (
                   <option value={c.id} key={c.id}>
-                    {c.full_name} · {c.phone}
+                    {c.full_name} · {c.phone || 'Sin teléfono'}
                   </option>
                 ))}
             </select>

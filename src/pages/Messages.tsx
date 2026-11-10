@@ -325,11 +325,13 @@ function MessageComposer({ template, onClose }: { template: Template; onClose: (
             }}
           >
             <option value="">Seleccionar cliente…</option>
-            {data.customers.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.full_name} · {c.phone}
-              </option>
-            ))}
+            {data.customers
+              .filter((c) => !c.deleted_at)
+              .map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.full_name} · {c.phone || 'Sin teléfono'}
+                </option>
+              ))}
           </select>
         </Field>
         <Field label="Turno para completar las variables">
@@ -368,7 +370,7 @@ function MessageComposer({ template, onClose }: { template: Template; onClose: (
             <Copy size={15} />
             Copiar mensaje
           </Button>
-          {customer && !unresolved ? (
+          {customer?.phone && !unresolved ? (
             <a
               className="btn btn-primary"
               href={whatsappUrl(customer.phone, rendered)}

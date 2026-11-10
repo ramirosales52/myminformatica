@@ -108,6 +108,9 @@ export function normalizePhone(phone: string, countryCode = '+54') {
     throw new Error('Ingresá un WhatsApp válido con código de país (7 a 15 dígitos).')
   return normalized
 }
+export function normalizeOptionalPhone(phone: string, countryCode = '+54') {
+  return phone.trim() ? normalizePhone(phone, countryCode) : ''
+}
 export function whatsappUrl(phone: string, text: string) {
   const normalized = normalizePhone(phone)
   return `https://wa.me/${normalized.slice(1)}?text=${encodeURIComponent(text)}`

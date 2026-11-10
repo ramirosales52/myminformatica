@@ -128,6 +128,62 @@ test('diferencia de hora se edita en agenda y no aparece en la ficha del cliente
   expect(preserved.data?.tz_offset_minutes).toBe(-210)
 })
 
+test('teléfono opcional y clientes compartidos editables y eliminables sin membresía', async ({
+  page,
+}) => {
+  const errors: string[] = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  await login(page, emails[2])
+  await page.locator('.topbar-new').click()
+  // Fijar el espacio de prueba: una cuenta sin membresía ve también espacios locales existentes.
+  const ownCustomer = await A.from('customers')
+    .insert({ workspace_id: workspace, full_name: 'Cliente compartido sin membresía' })
+    .select('id')
+    .single()
+  if (ownCustomer.error) throw ownCustomer.error
+  await page.getByLabel('Cliente registrado', { exact: true }).selectOption(ownCustomer.data.id)
+  await page.getByRole('button', { name: 'Nuevo cliente', exact: true }).click()
+  await page.getByLabel('Nombre y apellido', { exact: true }).fill('Cliente sin teléfono global')
+  await expect(page.getByLabel('WhatsApp (opcional)', { exact: true })).not.toHaveAttribute(
+    'required',
+  )
+  await page.getByRole('checkbox', { name: /CapCut Pro/ }).check()
+  await page.getByLabel('Fecha', { exact: true }).fill('2030-01-16')
+  await page.getByRole('button', { name: 'Agendar turno', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await page.locator('.main-nav').getByRole('button', { name: 'Clientes', exact: true }).click()
+  const row = page.getByRole('row').filter({ hasText: 'Cliente sin teléfono global' })
+  await expect(row).toContainText('Sin teléfono')
+  await expect(row.getByRole('link')).toHaveCount(0)
+  // La misma cuenta sin membresía también puede editar clientes creados por otro usuario.
+  await page.locator('.customer-name').filter({ hasText: 'Cliente compartido sin membresía' }).click()
+  await page.getByRole('button', { name: 'Editar datos', exact: true }).click()
+  await page
+    .getByLabel('Notas del cliente', { exact: true })
+    .fill('Edición desde una cuenta sin membresía')
+  await page.getByRole('button', { name: 'Guardar cliente', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await page.locator('.customer-name').filter({ hasText: 'Cliente sin teléfono global' }).click()
+  await expect(page.getByRole('dialog').getByRole('link')).toHaveCount(0)
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('button', { name: 'Eliminar cliente', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(row).toHaveCount(0)
+  const retained = await A.from('customers')
+    .select('id,deleted_at')
+    .eq('workspace_id', workspace)
+    .eq('full_name', 'Cliente sin teléfono global')
+    .single()
+  expect(retained.error).toBeNull()
+  expect(retained.data!.deleted_at).toBeTruthy()
+  const turn = await C.from('appointments')
+    .select('id')
+    .eq('customer_id', retained.data!.id)
+    .single()
+  expect(turn.error).toBeNull()
+  expect(errors).toEqual([])
+})
+
 test('flujo diario completo con dos sesiones, comprobantes y persistencia real', async ({
   browser,
   page,
@@ -145,7 +201,7 @@ test('flujo diario completo con dos sesiones, comprobantes y persistencia real',
   await page.locator('.topbar-new').click()
   await page.getByRole('button', { name: 'Nuevo cliente', exact: true }).click()
   await page.getByLabel('Nombre y apellido', { exact: true }).fill('Cliente verificado')
-  await page.getByLabel('WhatsApp', { exact: true }).fill('+5493510000999')
+  await page.getByLabel('WhatsApp (opcional)', { exact: true }).fill('+5493510000999')
   await page.getByText('CapCut Pro', { exact: true }).last().click()
   await page.getByRole('checkbox', { name: /Instalación de Office/ }).check()
   await expect(page.getByLabel('Duración (minutos)', { exact: true })).toHaveValue('120')
@@ -237,8 +293,10 @@ test('flujo diario completo con dos sesiones, comprobantes y persistencia real',
   const denied = await page.request.get(publicUrl)
   expect(denied.ok()).toBe(false)
   await page.getByRole('button', { name: 'Revocar enlace compartido', exact: true }).click()
-  const revoked = await page.request.get(signed)
-  expect(revoked.ok()).toBe(false)
+  await expect(
+    page.getByRole('button', { name: 'Revocar enlace compartido', exact: true }),
+  ).toHaveCount(0)
+  await expect.poll(async () => (await page.request.get(signed)).ok()).toBe(false)
   await page.getByRole('button', { name: 'Cerrar ventana', exact: true }).click()
   await page.screenshot({ path: '/tmp/opencode/agenda-dashboard.png', fullPage: true })
   await page
@@ -286,7 +344,10 @@ test('flujo diario completo con dos sesiones, comprobantes y persistencia real',
   await expect(
     page.locator('.message-card').filter({ hasText: 'Confirmación de turno' }),
   ).toContainText('*Hola {nombre_cliente}* 👋')
-  await page.locator('.main-nav').getByRole('button', { name: 'Agenda', exact: true }).click()
+  await page
+    .locator('.main-nav')
+    .getByRole('button', { name: /^Agenda\b/ })
+    .click()
   for (const view of ['Día', 'Semana', 'Mes']) {
     await page.locator('.agenda-toolbar').getByRole('button', { name: view, exact: true }).click()
     await expect(
@@ -315,7 +376,13 @@ test('flujo diario completo con dos sesiones, comprobantes y persistencia real',
     ]) {
       if (width <= 760)
         await page.getByRole('button', { name: 'Abrir navegación', exact: true }).click()
-      await page.locator('.main-nav').getByRole('button', { name: label, exact: true }).click()
+      await page
+        .locator('.main-nav')
+        .getByRole('button', {
+          name: label === 'Agenda' ? /^Agenda\b/ : label,
+          exact: label !== 'Agenda',
+        })
+        .click()
       await expect(
         page.getByRole('heading', { name: heading, exact: true, level: 1 }),
       ).toBeVisible()
@@ -397,6 +464,7 @@ test('un usuario sin membresías gestiona turnos ajenos con libertad total', asy
     .locator('.search-results')
     .getByRole('button')
     .filter({ hasText: 'Turno ·' })
+    .filter({ hasText: 'Cliente de agenda global' })
   await expect(localPhoneMatch).toContainText('Cliente de agenda global')
   await localPhoneMatch.click()
   await expect(
@@ -474,14 +542,25 @@ test('un usuario sin membresías gestiona turnos ajenos con libertad total', asy
   await expect(row).toContainText('Completado', { timeout: 20000 })
   await page.getByLabel('Búsqueda global').fill('Cliente de agenda global')
   await expect(
-    page.locator('.search-results').getByText('Cliente de agenda global', { exact: true }),
+    page
+      .locator('.search-results')
+      .getByRole('button')
+      .filter({ hasText: 'Cliente ·' })
+      .filter({ hasText: 'Cliente de agenda global' }),
   ).toBeVisible()
   await page.getByLabel('Búsqueda global').fill('3510000888')
   await expect(
-    page.locator('.search-results').getByRole('button').filter({ hasText: 'Turno ·' }),
+    page
+      .locator('.search-results')
+      .getByRole('button')
+      .filter({ hasText: 'Turno ·' })
+      .filter({ hasText: 'Cliente de agenda global' }),
   ).toContainText('Cliente de agenda global')
   await page.getByRole('button', { name: 'Cerrar búsqueda', exact: true }).click()
-  await page.locator('.main-nav').getByRole('button', { name: 'Agenda', exact: true }).click()
+  await page
+    .locator('.main-nav')
+    .getByRole('button', { name: /^Agenda\b/ })
+    .click()
   await page.getByRole('button', { name: 'Mes', exact: true }).click()
   await expect(
     page.locator('.month-appointment').filter({ hasText: 'Cliente' }).first(),
@@ -537,7 +616,7 @@ test('un usuario sin membresías gestiona turnos ajenos con libertad total', asy
   await page
     .getByLabel('Nombre y apellido', { exact: true })
     .fill('Nuevo cliente del operador global')
-  await page.getByLabel('WhatsApp', { exact: true }).fill('+5493510000777')
+  await page.getByLabel('WhatsApp (opcional)', { exact: true }).fill('+5493510000777')
   await page.locator('.service-option').first().click()
   await page.getByLabel('Hora de inicio (24 h)').fill('05:00')
   await page.getByRole('button', { name: 'Agendar turno', exact: true }).click()

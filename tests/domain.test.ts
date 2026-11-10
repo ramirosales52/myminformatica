@@ -6,6 +6,7 @@ import {
   inRange,
   money,
   normalizePhone,
+  normalizeOptionalPhone,
   paidFor,
   paymentState,
   shifted,
@@ -91,6 +92,14 @@ describe('Reglas económicas', () => {
   })
 })
 describe('Argentina, WhatsApp y exportación segura', () => {
+  it('admite teléfono opcional sin omitir la validación de números ingresados', () => {
+    expect(normalizeOptionalPhone('')).toBe('')
+    expect(normalizeOptionalPhone('   ')).toBe('')
+    expect(normalizeOptionalPhone('9 351 1234567', '+54')).toBe('+5493511234567')
+    expect(() => normalizeOptionalPhone('123')).toThrow()
+    expect(() => normalizeOptionalPhone('abc')).toThrow()
+    expect(() => whatsappUrl('', 'Hola')).toThrow()
+  })
   it('interpreta las 14:30 en Córdoba como 17:30 UTC', () => {
     expect(toUTC('2026-11-09T14:30')).toBe('2026-11-09T17:30:00.000Z')
     expect(zoned('2026-11-10T02:30:00Z', 'yyyy-MM-dd HH:mm')).toBe('2026-11-09 23:30')
