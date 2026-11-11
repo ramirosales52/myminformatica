@@ -2928,6 +2928,8 @@ tbody > tr:hover {
   }
 }
 .modal {
+  min-height: 0;
+  overscroll-behavior-y: contain;
   max-width: 540px;
   width: 100%;
   max-height: calc(100dvh - 50px);

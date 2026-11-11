@@ -10,6 +10,7 @@ import {
   Plus,
   Search,
   Settings2,
+  Trash2,
   Video,
   WandSparkles,
   Zap,
@@ -42,8 +43,10 @@ export function Services({
   const [category, setCategory] = useState('all')
   const [active, setActive] = useState('all')
   const [editing, setEditing] = useState<Service | 'new' | null>(null)
+  const [deleting, setDeleting] = useState<Service | null>(null)
   const [busyId, setBusyId] = useState('')
-  const services = data.services
+  const catalog = data.services.filter((s) => !s.deleted_at)
+  const services = catalog
     .filter(
       (s) =>
         s.name.toLowerCase().includes(search.toLowerCase()) &&
@@ -52,6 +55,7 @@ export function Services({
     )
     .toSorted((a, b) => a.name.localeCompare(b.name))
   async function toggle(s: Service) {
+    if (!onRequireConnection()) return
     setBusyId(s.id)
     try {
       const { error } = await db()
@@ -59,6 +63,7 @@ export function Services({
         .update({ active: !s.active })
         .eq('id', s.id)
         .eq('version', s.version)
+        .is('deleted_at', null)
         .select()
         .single()
       if (error) throw error
@@ -66,6 +71,28 @@ export function Services({
       notify(
         s.active ? 'Servicio desactivado. Los turnos anteriores no cambian.' : 'Servicio activado.',
       )
+    } catch (err) {
+      notify(messageFor(err), true)
+    } finally {
+      setBusyId('')
+    }
+  }
+  async function remove(s: Service) {
+    if (!onRequireConnection() || busyId) return
+    setBusyId(s.id)
+    try {
+      const { error } = await db()
+        .from('services')
+        .update({ deleted_at: new Date().toISOString(), active: false })
+        .eq('id', s.id)
+        .eq('version', s.version)
+        .is('deleted_at', null)
+        .select()
+        .single()
+      if (error) throw error
+      await refresh()
+      setDeleting(null)
+      notify('Servicio eliminado. Los turnos y su historial se conservaron.')
     } catch (err) {
       notify(messageFor(err), true)
     } finally {
@@ -90,7 +117,7 @@ export function Services({
       <div className="catalog-summary">
         <span>
           <Package size={19} />
-          <strong>{data.services.filter((s) => s.active).length}</strong> servicios activos
+          <strong>{catalog.filter((s) => s.active).length}</strong> servicios activos
         </span>
         <span>
           <Settings2 size={15} />
@@ -113,7 +140,7 @@ export function Services({
           onChange={(e) => setCategory(e.target.value)}
         >
           <option value="all">Todas las categorías</option>
-          {[...new Set(data.services.map((s) => s.category))].map((c) => (
+          {[...new Set(catalog.map((s) => s.category))].map((c) => (
             <option key={c}>{c}</option>
           ))}
         </select>
@@ -143,10 +170,23 @@ export function Services({
                   </span>
                   <button
                     className="icon-btn ml-auto"
-                    onClick={() => setEditing(s)}
+                    disabled={Boolean(busyId)}
+                    onClick={() => {
+                      if (onRequireConnection()) setEditing(s)
+                    }}
                     aria-label={`Editar ${s.name}`}
                   >
                     <Pencil size={16} />
+                  </button>
+                  <button
+                    className="icon-btn text-red"
+                    disabled={Boolean(busyId)}
+                    onClick={() => {
+                      if (onRequireConnection()) setDeleting(s)
+                    }}
+                    aria-label={`Eliminar ${s.name}`}
+                  >
+                    <Trash2 size={16} />
                   </button>
                 </div>
                 <span className="service-category">{s.category}</span>
@@ -174,7 +214,7 @@ export function Services({
                   )}
                   <button
                     className="text-link"
-                    disabled={busyId === s.id}
+                    disabled={Boolean(busyId)}
                     onClick={() => void toggle(s)}
                   >
                     {busyId === s.id ? 'Guardando…' : s.active ? 'Desactivar' : 'Activar'}
@@ -210,6 +250,30 @@ export function Services({
           onClose={() => setEditing(null)}
         />
       ) : null}
+      {deleting ? (
+        <Modal title="Eliminar servicio" onClose={() => setDeleting(null)} busy={Boolean(busyId)}>
+          <p>
+            ¿Eliminar <strong>{deleting.name}</strong> del catálogo? Ya no estará disponible para
+            nuevos turnos. Los turnos existentes, precios acordados y cobros se conservarán.
+          </p>
+          <div className="modal-actions">
+            <Button
+              variant="secondary"
+              onClick={() => setDeleting(null)}
+              disabled={Boolean(busyId)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => void remove(deleting)}
+              loading={Boolean(busyId)}
+            >
+              Eliminar servicio
+            </Button>
+          </div>
+        </Modal>
+      ) : null}
     </div>
   )
 }
@@ -240,7 +304,12 @@ function ServiceForm({ service, onClose }: { service?: Service; onClose: () => v
         active,
       }
       const request = service
-        ? db().from('services').update(values).eq('id', service.id).eq('version', service.version)
+        ? db()
+            .from('services')
+            .update(values)
+            .eq('id', service.id)
+            .eq('version', service.version)
+            .is('deleted_at', null)
         : db()
             .from('services')
             .insert({ ...values, workspace_id: workspace!.id })

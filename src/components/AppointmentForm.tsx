@@ -292,7 +292,7 @@ export function AppointmentForm({
         </div>
         <div className="service-picker">
           {data.services
-            .filter((s) => s.active || lines.some((l) => l.service_id === s.id))
+            .filter((s) => (s.active && !s.deleted_at) || lines.some((l) => l.service_id === s.id))
             .map((s) => (
               <label
                 className={`service-option ${lines.some((l) => l.service_id === s.id) ? 'selected' : ''}`}
@@ -315,7 +315,7 @@ export function AppointmentForm({
                 </span>
               </label>
             ))}
-          {!data.services.length ? (
+          {!data.services.some((s) => s.active && !s.deleted_at) && !lines.length ? (
             <p className="muted">Primero registrá tus servicios en el catálogo.</p>
           ) : null}
         </div>

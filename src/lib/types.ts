@@ -49,6 +49,7 @@ export interface Service {
   price_usd: number
   active: boolean
   version: number
+  deleted_at: string | null
 }
 export interface Appointment {
   id: string

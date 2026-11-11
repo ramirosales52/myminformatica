@@ -20,6 +20,8 @@ export function db() {
 export function messageFor(error: unknown): string {
   if (error && typeof error === 'object' && 'message' in error) {
     const message = String(error.message)
+    if (message.includes('services_unique_catalog_name'))
+      return 'Ya existe un servicio con ese nombre. Editá el existente o elegí otro nombre.'
     if (message.includes('appointments_no_duplicate'))
       return 'Ya existe un turno activo de este cliente en ese horario. Revisá la agenda antes de volver a crearlo.'
     if ('code' in error && error.code === 'PGRST116')

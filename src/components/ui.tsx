@@ -1,4 +1,5 @@
 import { cloneElement, isValidElement, useEffect, useId, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import type { ButtonHTMLAttributes, ReactElement, ReactNode } from 'react'
 import { ArrowUpRight, CalendarDays, LoaderCircle, X } from 'lucide-react'
 import { STATUS } from '../lib/types'
@@ -85,7 +86,7 @@ export function Modal({
       previous?.focus()
     }
   }, [])
-  return (
+  return createPortal(
     <div
       className="modal-backdrop"
       onMouseDown={(e) => {
@@ -116,7 +117,8 @@ export function Modal({
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 export function Field({

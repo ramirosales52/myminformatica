@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   CalendarDays,
   Check,
+  Copy,
   Download,
   FileText,
   Link2,
@@ -139,6 +140,35 @@ export function Receipt({
       setBusy(false)
     }
   }
+  async function copyImage() {
+    setBusy(true)
+    try {
+      if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined')
+        throw new Error('Tu navegador no permite copiar imágenes. Podés descargar el PNG o PDF.')
+      // Iniciar la escritura durante el clic; Safari pierde el permiso si esperamos a generar el PNG.
+      const blob = png().then(async (image) => {
+        const result = await (await fetch(image)).blob()
+        if (staleRef.current)
+          throw new Error(
+            'El turno cambió. Cerrá y volvé a abrir el comprobante para usar los datos actuales.',
+          )
+        return result
+      })
+      // También manejar el rechazo si el navegador deniega la escritura antes de consumir la imagen.
+      void blob.catch(() => {})
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+      notify('Imagen copiada. Ya podés pegarla en WhatsApp u otra aplicación.')
+    } catch (err) {
+      notify(
+        err instanceof DOMException && err.name === 'NotAllowedError'
+          ? 'No se pudo copiar la imagen. Permití el acceso al portapapeles o descargá el PNG.'
+          : messageFor(err),
+        true,
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
   async function revoke() {
     setBusy(true)
     try {
@@ -156,11 +186,7 @@ export function Receipt({
     }
   }
   return (
-    <Modal
-      title="Comprobante del turno"
-      onClose={onClose}
-      busy={busy}
-    >
+    <Modal title="Comprobante del turno" onClose={onClose} busy={busy}>
       {stale ? (
         <p className="warning">
           El turno, el cliente o sus cobros cambiaron. Cerrá y volvé a abrir este comprobante para
@@ -262,6 +288,10 @@ export function Receipt({
         </div>
       </div>
       <div className="quick-amounts mt-5">
+        <Button onClick={() => void copyImage()} loading={busy} disabled={stale}>
+          <Copy size={16} />
+          Copiar imagen
+        </Button>
         <Button
           variant="secondary"
           onClick={() => void generate('png')}
@@ -322,7 +352,7 @@ export function Receipt({
         <small>
           {customer?.phone
             ? 'No se envían mensajes automáticamente.'
-            : 'Sin teléfono: podés descargar el comprobante en PNG o PDF.'}
+            : 'Sin teléfono: podés copiar la imagen o descargar el comprobante en PNG o PDF.'}
         </small>
       </div>
     </Modal>

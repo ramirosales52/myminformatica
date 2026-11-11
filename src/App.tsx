@@ -234,7 +234,9 @@ function WorkspaceApp() {
         .slice(0, 3)
     : []
   const foundServices = needle
-    ? data.services.filter((s) => s.name.toLowerCase().includes(needle)).slice(0, 2)
+    ? data.services
+        .filter((s) => !s.deleted_at && s.name.toLowerCase().includes(needle))
+        .slice(0, 2)
     : []
   const foundTemplates = needle
     ? data.templates

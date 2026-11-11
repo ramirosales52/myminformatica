@@ -106,10 +106,10 @@ beforeAll(async () => {
         "insert into public.workspace_members(workspace_id,user_id,role) values($1,$2,'admin')",
         [id, user.id],
       )
-      await fixture.query(
-        "insert into public.services(workspace_id,name) values($1,'Servicio QA')",
-        [id],
-      )
+      await fixture.query('insert into public.services(workspace_id,name) values($1,$2)', [
+        id,
+        `Servicio QA ${id}`,
+      ])
       await fixture.query(
         "insert into public.message_templates(workspace_id,title,body) values($1,'Mensaje QA','Hola')",
         [id],
@@ -195,6 +195,62 @@ afterAll(async () => {
   }
 })
 describe('Supabase real: seguridad, dinero y sincronización', () => {
+  it('elimina servicios sin perder acuerdos y evita nombres duplicados entre cuentas', async () => {
+    const name = `Servicio borrable ${crypto.randomUUID()}`
+    const created = await A.from('services')
+      .insert({ workspace_id: workspace, name })
+      .select()
+      .single()
+    expect(created.error).toBeNull()
+    const s = created.data!
+    const duplicate = await C.from('services').insert({
+      workspace_id: workspaces[1],
+      name: `  ${name.toUpperCase().replaceAll(' ', '  ')}  `,
+    })
+    expect(duplicate.error?.code).toBe('23505')
+    const id = await rpc<string>(A, 'save_appointment', {
+      p_workspace: workspace,
+      p_request_id: crypto.randomUUID(),
+      p_payload: {
+        ...payload,
+        starts_at: later(500),
+        services: [{ service_id: s.id, name, price_cents: 2000, duration_minutes: 60 }],
+      },
+    })
+    const before = await A.from('appointment_services').select('*').eq('appointment_id', id)
+    const removed = await D.from('services')
+      .update({ deleted_at: new Date().toISOString(), active: false })
+      .eq('id', s.id)
+      .eq('version', s.version)
+      .is('deleted_at', null)
+      .select()
+      .single()
+    expect(removed.error).toBeNull()
+    expect(removed.data.deleted_at).not.toBeNull()
+    expect(removed.data.active).toBe(false)
+    const stale = await A.from('services')
+      .update({ active: true })
+      .eq('id', s.id)
+      .eq('version', s.version)
+      .is('deleted_at', null)
+      .select()
+      .single()
+    expect(stale.error?.code).toBe('PGRST116')
+    const after = await A.from('appointment_services').select('*').eq('appointment_id', id)
+    expect(after.error).toBeNull()
+    expect(after.data).toEqual(before.data)
+    const schedule = await rpc<ScheduledAppointment[]>(A, 'global_schedule', {})
+    expect(schedule.find((a) => a.id === id)?.services).toEqual([{ service_id: s.id, name }])
+    const replacement = await A.from('services').insert({ workspace_id: workspace, name })
+    expect(replacement.error).toBeNull()
+    const anonymous = client()
+    const denied = await anonymous
+      .from('services')
+      .update({ active: false, deleted_at: new Date().toISOString() })
+      .eq('id', s.id)
+    expect(denied.error).not.toBeNull()
+    await rpc(A, 'delete_appointment', { p_id: id, p_version: 1 })
+  })
   it('todas las cuentas usan un único negocio sin crear espacios ni membresías', async () => {
     const ids = await Promise.all(
       [A, B, C, D].map((c) => rpc(c, 'create_workspace', { p_name: 'Ignorado' })),
