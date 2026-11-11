@@ -57,7 +57,18 @@ export function AppointmentForm({
   const [lines, setLines] = useState<AppointmentService[]>(
     appointment ? data.appointmentServices.filter((l) => l.appointment_id === appointment.id) : [],
   )
-  const [amount, setAmount] = useState(String((appointment?.total_cents ?? 0) / 100))
+  const [customAmount, setCustomAmount] = useState<string | null>(() => {
+    const subtotal = lines.reduce((sum, line) => sum + line.price_cents, 0)
+    return appointment && appointment.total_cents !== subtotal
+      ? String(appointment.total_cents / 100)
+      : null
+  })
+  const subtotal = lines.reduce((sum, line) => sum + line.price_cents, 0)
+  const amount = customAmount ?? String(subtotal / 100)
+  const adjustment =
+    amount.trim() && Number.isFinite(Number(amount))
+      ? subtotal - Math.round(Number(amount) * 100)
+      : 0
   const [minutes, setMinutes] = useState(appointment?.duration_minutes ?? 60)
   const [date, setDate] = useState(
     appointment ? zoned(appointment.starts_at, 'yyyy-MM-dd') : (initialDay ?? today()),
@@ -110,7 +121,6 @@ export function AppointmentForm({
           },
         ]
     setLines(updated)
-    setAmount(String(updated.reduce((s, l) => s + l.price_cents, 0) / 100))
     setMinutes(updated.reduce((s, l) => s + l.duration_minutes, 0) || 60)
   }
   function changeCurrency(value: Currency) {
@@ -123,7 +133,8 @@ export function AppointmentForm({
       }
     })
     setLines(updated)
-    setAmount(String(updated.reduce((s, l) => s + l.price_cents, 0) / 100))
+    // Un importe acordado en otra moneda no se puede convertir sin un tipo de cambio.
+    setCustomAmount(null)
     setInitialPayment('0')
   }
   async function save(e: FormEvent) {
@@ -290,6 +301,9 @@ export function AppointmentForm({
           <h3>Servicios del turno</h3>
           <span className="muted ml-auto">Podés combinar varios</span>
         </div>
+        <p className="muted small">
+          Marcá todos los servicios que vas a realizar. Podés sumar otros editando este mismo turno.
+        </p>
         <div className="service-picker">
           {data.services
             .filter((s) => (s.active && !s.deleted_at) || lines.some((l) => l.service_id === s.id))
@@ -319,6 +333,14 @@ export function AppointmentForm({
             <p className="muted">Primero registrá tus servicios en el catálogo.</p>
           ) : null}
         </div>
+        {lines.length ? (
+          <div className="inline-info" aria-live="polite">
+            {lines.length}{' '}
+            {lines.length === 1 ? 'servicio seleccionado' : 'servicios seleccionados'}
+            {' · '}
+            {lines.map((line) => line.name).join(' + ')}
+          </div>
+        ) : null}
         <div className="form-section-title">
           <CalendarDays size={17} />
           <h3>Fecha y horario</h3>
@@ -411,6 +433,26 @@ export function AppointmentForm({
           <Wallet size={17} />
           <h3>Importe acordado</h3>
         </div>
+        <div className="inline-info" aria-live="polite">
+          Suma de servicios: {money(subtotal, currency)}
+          {adjustment > 0 ? ` · Descuento: ${money(adjustment, currency)}` : null}
+          {adjustment < 0 ? ` · Adicional: ${money(-adjustment, currency)}` : null}
+        </div>
+        {customAmount !== null ? (
+          <div className="inline-info">
+            Precio personalizado: se mantiene aunque agregues o quites servicios.
+            <button
+              type="button"
+              className="text-link"
+              onClick={() => {
+                setCustomAmount(null)
+                setDirty(true)
+              }}
+            >
+              Usar suma de servicios
+            </button>
+          </div>
+        ) : null}
         <div className="form-grid three">
           <Field label="Moneda">
             <select value={currency} onChange={(e) => changeCurrency(e.target.value as Currency)}>
@@ -418,7 +460,10 @@ export function AppointmentForm({
               <option value="USD">Dólares (USD)</option>
             </select>
           </Field>
-          <Field label="Precio total">
+          <Field
+            label="Precio total"
+            hint="Importe final por todos los servicios. Podés editarlo para aplicar un descuento o acordar otro precio."
+          >
             <input
               inputMode="decimal"
               type="number"
@@ -427,7 +472,7 @@ export function AppointmentForm({
               max={1000000000}
               step="0.01"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              onChange={(e) => setCustomAmount(e.target.value)}
             />
           </Field>
           <Field label="Medio de pago">

@@ -56,6 +56,7 @@ export function Receipt({
     generatedAt: new Date().toISOString(),
   }))
   const { appointment, workspace, customer, paid, lines, generatedAt } = snapshot
+  const subtotal = lines.reduce((sum, line) => sum + line.price_cents, 0)
   // El comprobante se lee en el país del cliente; la diferencia se carga a mano en el cliente.
   const offset = customer?.tz_offset_minutes ?? null
   const stale =
@@ -253,6 +254,18 @@ export function Receipt({
             ))}
           </div>
           <div className="receipt-totals">
+            {subtotal > appointment.total_cents ? (
+              <>
+                <p>
+                  <span>Suma de servicios</span>
+                  <strong>{money(subtotal, appointment.currency)}</strong>
+                </p>
+                <p>
+                  <span>Descuento acordado</span>
+                  <strong>{money(subtotal - appointment.total_cents, appointment.currency)}</strong>
+                </p>
+              </>
+            ) : null}
             <p>
               <span>Importe total</span>
               <strong>{money(appointment.total_cents, appointment.currency)}</strong>

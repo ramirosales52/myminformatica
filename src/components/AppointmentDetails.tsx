@@ -55,6 +55,9 @@ export function AppointmentDetails({
     )
   const customer = data.customers.find((c) => c.id === a.customer_id)
   const paid = paidFor(a.id, data.payments)
+  const subtotal = data.appointmentServices
+    .filter((line) => line.appointment_id === a.id)
+    .reduce((sum, line) => sum + line.price_cents, 0)
   const movements = data.payments
     .filter((p) => p.appointment_id === a.id)
     .toSorted((a, b) => b.paid_at.localeCompare(a.paid_at))
@@ -148,6 +151,13 @@ export function AppointmentDetails({
           <strong>{money(Math.max(0, a.total_cents - paid), a.currency)}</strong>
         </div>
       </div>
+      {subtotal !== a.total_cents ? (
+        <div className="inline-info">
+          Suma de servicios: {money(subtotal, a.currency)} ·{' '}
+          {subtotal > a.total_cents ? 'Descuento' : 'Adicional'}:{' '}
+          {money(Math.abs(subtotal - a.total_cents), a.currency)} · Precio personalizado
+        </div>
+      ) : null}
       <div className="detail-actions">
         <Button onClick={() => onPayment(a)}>
           <Wallet size={16} />
