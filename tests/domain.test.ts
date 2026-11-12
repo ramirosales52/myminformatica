@@ -9,6 +9,7 @@ import {
   normalizeOptionalPhone,
   paidFor,
   paymentState,
+  quickChargeAmount,
   shifted,
   signedAmount,
   toCents,
@@ -42,6 +43,21 @@ const payment = (
     paid_at: '2026-11-09T16:00:00Z',
   }) as Payment
 describe('Reglas económicas', () => {
+  it('el atajo del 50% completa la mitad acumulada, sin sumar otra mitad', () => {
+    expect(quickChargeAmount(2000000, 0, 'half')).toBe(1000000)
+    expect(quickChargeAmount(2000000, 400000, 'half')).toBe(600000)
+    expect(quickChargeAmount(2000000, 1000000, 'half')).toBe(0)
+    expect(quickChargeAmount(2000000, 1500000, 'half')).toBe(0)
+    expect(quickChargeAmount(101, 0, 'half')).toBe(51)
+  })
+  it('el atajo de saldo solo cobra lo pendiente, incluso tras devoluciones', () => {
+    expect(quickChargeAmount(2000000, 400000, 'balance')).toBe(1600000)
+    expect(quickChargeAmount(2000000, 2000000, 'balance')).toBe(0)
+    expect(quickChargeAmount(0, 0, 'balance')).toBe(0)
+    expect(quickChargeAmount(100, 150, 'balance')).toBe(0)
+    const net = paidFor('a', [payment(2000), payment(500, 'refund')])
+    expect(quickChargeAmount(2000, net, 'balance')).toBe(500)
+  })
   it('convierte decimales a centavos sin truncar', () => {
     expect(toCents('20.10')).toBe(2010)
     expect(toCents('0,29')).toBe(29)

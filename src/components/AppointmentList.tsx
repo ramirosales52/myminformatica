@@ -12,17 +12,21 @@ import {
 } from '../lib/domain'
 import type { Appointment, ScheduledAppointment } from '../lib/types'
 import { Badge, Button, Empty } from './ui'
+import type { OnAppointmentAction } from '../lib/appointmentActions'
+import { AppointmentQuickActions } from './AppointmentQuickActions'
 
 export function AppointmentList({
   appointments,
   onSelect,
   onNew,
   showDate = false,
+  onAction,
 }: {
   appointments: (Appointment | ScheduledAppointment)[]
   onSelect: (id: string) => void
   onNew?: () => void
   showDate?: boolean
+  onAction?: OnAppointmentAction
 }) {
   const { appointmentData: data } = useData()
   if (!appointments.length)
@@ -53,53 +57,66 @@ export function AppointmentList({
           const paid = paidFor(a.id, data.payments)
           const state = local ? paymentState(local.total_cents, paid) : undefined
           return (
-            <button
-              className={`appointment-row ${a.status === 'cancelled' ? 'is-cancelled' : ''}`}
+            <article
+              className="appointment-card"
               key={a.id}
-              onClick={() => onSelect(a.id)}
+              aria-label={`Turno de ${customerName}`}
             >
-              <div className="appointment-time">
-                <strong>{zoned(a.starts_at, 'HH:mm')}</strong>
-                <span>
-                  {showDate ? zoned(a.starts_at, 'dd MMM') : duration(a.duration_minutes)}
-                </span>
-              </div>
-              <span className={`avatar avatar-${a.status}`}>{initials(customerName)}</span>
-              <div className="appointment-main">
-                <strong>{customerName}</strong>
-                <span>
-                  <Monitor size={13} />
-                  {summary
-                    ? summary.services.map((s) => s.name).join(' · ')
-                    : serviceNames(a.id, data.appointmentServices)}
-                </span>
-                <small>
-                  <Clock3 size={12} />
-                  {duration(a.duration_minutes)} · Remoto
-                </small>
-              </div>
-              <div className="appointment-state">
-                <Badge status={a.status} />
-                {state ? (
-                  <span className={`payment-text ${state}`}>{PAYMENT_STATUS[state]}</span>
-                ) : (
-                  <span className="muted small">Actualizando detalle…</span>
-                )}
-              </div>
-              <div className="appointment-amount">
-                {local ? (
-                  <>
-                    <strong>{money(local.total_cents, local.currency)}</strong>
-                    <span>
-                      {paid > 0 ? `${money(paid, local.currency)} cobrado` : 'Sin cobros'}
-                    </span>
-                  </>
-                ) : (
-                  <span>{summary?.responsible_name}</span>
-                )}
-              </div>
-              <ArrowUpRight className="row-arrow" size={17} />
-            </button>
+              <button
+                className={`appointment-row ${a.status === 'cancelled' ? 'is-cancelled' : ''}`}
+                onClick={() => onSelect(a.id)}
+              >
+                <div className="appointment-time">
+                  <strong>{zoned(a.starts_at, 'HH:mm')}</strong>
+                  <span>
+                    {showDate ? zoned(a.starts_at, 'dd MMM') : duration(a.duration_minutes)}
+                  </span>
+                </div>
+                <span className={`avatar avatar-${a.status}`}>{initials(customerName)}</span>
+                <div className="appointment-main">
+                  <strong>{customerName}</strong>
+                  <span>
+                    <Monitor size={13} />
+                    {summary
+                      ? summary.services.map((s) => s.name).join(' · ')
+                      : serviceNames(a.id, data.appointmentServices)}
+                  </span>
+                  <small>
+                    <Clock3 size={12} />
+                    {duration(a.duration_minutes)} · Remoto
+                  </small>
+                </div>
+                <div className="appointment-state">
+                  <Badge status={a.status} />
+                  {state ? (
+                    <span className={`payment-text ${state}`}>{PAYMENT_STATUS[state]}</span>
+                  ) : (
+                    <span className="muted small">Actualizando detalle…</span>
+                  )}
+                </div>
+                <div className="appointment-amount">
+                  {local ? (
+                    <>
+                      <strong>{money(local.total_cents, local.currency)}</strong>
+                      <span>
+                        {paid > 0
+                          ? `${money(paid, local.currency)} cobrado${local.total_cents > 0 ? ` · ${Math.round((paid * 100) / local.total_cents)}%` : ''}`
+                          : 'Sin cobros'}
+                      </span>
+                      {local.status !== 'cancelled' && local.total_cents > paid ? (
+                        <span className="appointment-pending">
+                          Falta cobrar {money(local.total_cents - paid, local.currency)}
+                        </span>
+                      ) : null}
+                    </>
+                  ) : (
+                    <span>{summary?.responsible_name}</span>
+                  )}
+                </div>
+                <ArrowUpRight className="row-arrow" size={17} />
+              </button>
+              {local ? <AppointmentQuickActions appointment={local} onAction={onAction} /> : null}
+            </article>
           )
         })}
     </div>

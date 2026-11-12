@@ -12,6 +12,7 @@ import {
 import { useData } from '../providers/DataProvider'
 import { useToast } from '../providers/ToastProvider'
 import { messageFor, rpc } from '../lib/supabase'
+import { updateAppointment } from '../lib/appointmentActions'
 import {
   duration,
   endTime,
@@ -72,17 +73,7 @@ export function AppointmentDetails({
       return
     setBusy(true)
     try {
-      await rpc('save_appointment', {
-        p_workspace: a!.workspace_id,
-        p_id: a!.id,
-        p_version: a!.version,
-        p_request_id: crypto.randomUUID(),
-        p_payload: {
-          ...a,
-          status,
-          services: data.appointmentServices.filter((s) => s.appointment_id === a!.id),
-        },
-      })
+      await updateAppointment(a!, data.appointmentServices, { status })
       await refresh()
       notify('Estado del turno actualizado.')
     } catch (err) {

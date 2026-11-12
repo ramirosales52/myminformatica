@@ -9,6 +9,8 @@ import {
   SlidersHorizontal,
 } from 'lucide-react'
 import { useData } from '../providers/DataProvider'
+import { useAuth } from '../providers/AuthProvider'
+import type { OnAppointmentAction } from '../lib/appointmentActions'
 import {
   monthDays,
   paidFor,
@@ -23,24 +25,58 @@ import { STATUS } from '../lib/types'
 import { AppointmentList } from '../components/AppointmentList'
 import { Button, PageHeading } from '../components/ui'
 
+export interface AgendaState {
+  day: string
+  view: 'day' | 'week' | 'month'
+  search: string
+  status: string
+  service: string
+  responsible: string
+  payment: string
+  filters: boolean
+}
+
 export function Agenda({
   initialDay,
   onNew,
   onSelect,
+  onAction,
+  savedState,
+  onStateChange,
 }: {
   initialDay?: string
   onNew: (day?: string) => void
   onSelect: (id: string) => void
+  onAction?: OnAppointmentAction
+  savedState?: AgendaState
+  onStateChange?: (state: AgendaState) => void
 }) {
   const { appointmentData: data, schedule } = useData()
-  const [day, setDay] = useState(initialDay ?? today())
-  const [view, setView] = useState<'day' | 'week' | 'month'>('week')
-  const [search, setSearch] = useState('')
-  const [status, setStatus] = useState('all')
-  const [service, setService] = useState('all')
-  const [responsible, setResponsible] = useState('all')
-  const [payment, setPayment] = useState('all')
-  const [filters, setFilters] = useState(false)
+  const { session } = useAuth()
+  const [localState, setLocalState] = useState<AgendaState>(() => ({
+    day: initialDay ?? today(),
+    view: 'week',
+    search: '',
+    status: 'all',
+    service: 'all',
+    responsible: 'all',
+    payment: 'all',
+    filters: false,
+  }))
+  const state = savedState ?? localState
+  const { day, view, search, status, service, responsible, payment, filters } = state
+  function update(changes: Partial<AgendaState>) {
+    const next = { ...state, ...changes }
+    if (onStateChange) onStateChange(next)
+    else setLocalState(next)
+  }
+  const setDay = (day: string) => update({ day })
+  const setView = (view: AgendaState['view']) => update({ view })
+  const setSearch = (search: string) => update({ search })
+  const setStatus = (status: string) => update({ status })
+  const setService = (service: string) => update({ service })
+  const setResponsible = (responsible: string) => update({ responsible })
+  const setPayment = (payment: string) => update({ payment })
   const services = [
     ...new Map(schedule.flatMap((a) => a.services).map((s) => [s.service_id, s])).values(),
   ]
@@ -56,7 +92,10 @@ export function Agenda({
       (responsible === 'all' || a.responsible_id === responsible) &&
       (service === 'all' || a.services.some((s) => s.service_id === service)) &&
       (payment === 'all' ||
-        (local && paymentState(local.total_cents, paidFor(a.id, data.payments)) === payment))
+        (local &&
+          (payment === 'outstanding'
+            ? a.status !== 'cancelled' && local.total_cents > paidFor(a.id, data.payments)
+            : paymentState(local.total_cents, paidFor(a.id, data.payments)) === payment)))
     )
   })
   const days = weekDays(day)
@@ -116,10 +155,58 @@ export function Agenda({
               aria-label="Buscar turnos"
             />
           </div>
-          <Button variant={filters ? 'primary' : 'secondary'} onClick={() => setFilters((v) => !v)}>
+          <Button
+            variant={filters ? 'primary' : 'secondary'}
+            onClick={() => update({ filters: !filters })}
+          >
             <SlidersHorizontal size={16} />
             Filtros{countFilters ? <span className="count">{countFilters}</span> : null}
           </Button>
+        </div>
+        <div className="agenda-shortcuts" role="group" aria-label="Filtros rápidos">
+          <button
+            aria-pressed={day === today()}
+            onClick={() => update({ day: today(), view: 'day' })}
+          >
+            Hoy
+          </button>
+          <button
+            aria-pressed={status === 'pending'}
+            onClick={() => update({ status: status === 'pending' ? 'all' : 'pending' })}
+          >
+            Por confirmar
+          </button>
+          <button
+            aria-pressed={payment === 'outstanding'}
+            onClick={() => update({ payment: payment === 'outstanding' ? 'all' : 'outstanding' })}
+          >
+            Por cobrar
+          </button>
+          <button
+            aria-pressed={responsible === session?.user.id}
+            onClick={() =>
+              update({
+                responsible: responsible === session?.user.id ? 'all' : (session?.user.id ?? 'all'),
+              })
+            }
+          >
+            Mis turnos
+          </button>
+          {countFilters || search ? (
+            <button
+              onClick={() =>
+                update({
+                  status: 'all',
+                  service: 'all',
+                  responsible: 'all',
+                  payment: 'all',
+                  search: '',
+                })
+              }
+            >
+              Limpiar filtros
+            </button>
+          ) : null}
         </div>
         {filters ? (
           <div className="filter-row">
@@ -160,6 +247,7 @@ export function Agenda({
               Pago
               <select value={payment} onChange={(e) => setPayment(e.target.value)}>
                 <option value="all">Todos los pagos</option>
+                <option value="outstanding">Con saldo pendiente</option>
                 <option value="unpaid">No pagado</option>
                 <option value="partial">Pago parcial</option>
                 <option value="paid">Pagado</option>
@@ -168,10 +256,7 @@ export function Agenda({
             <button
               className="text-link"
               onClick={() => {
-                setStatus('all')
-                setService('all')
-                setResponsible('all')
-                setPayment('all')
+                update({ status: 'all', service: 'all', responsible: 'all', payment: 'all' })
               }}
             >
               Limpiar
@@ -215,8 +300,7 @@ export function Agenda({
                 <button
                   className="month-day"
                   onClick={() => {
-                    setDay(d)
-                    setView('day')
+                    update({ day: d, view: 'day' })
                   }}
                   aria-label={`Ver turnos del ${d}`}
                 >
@@ -239,8 +323,7 @@ export function Agenda({
                   <button
                     className="month-more"
                     onClick={() => {
-                      setDay(d)
-                      setView('day')
+                      update({ day: d, view: 'day' })
                     }}
                   >
                     Ver todos
@@ -257,7 +340,12 @@ export function Agenda({
               <span className="count">{selected.length}</span>
               <span className="muted ml-auto small">Argentina · UTC−3</span>
             </div>
-            <AppointmentList appointments={selected} onSelect={onSelect} onNew={() => onNew(day)} />
+            <AppointmentList
+              appointments={selected}
+              onSelect={onSelect}
+              onNew={() => onNew(day)}
+              onAction={onAction}
+            />
           </>
         )}
         <div className="panel-footer">
@@ -283,6 +371,7 @@ export function Agenda({
             .slice(0, 5)}
           onSelect={onSelect}
           showDate
+          onAction={onAction}
         />
       </section>
     </div>

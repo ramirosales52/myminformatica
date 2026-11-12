@@ -19,6 +19,7 @@ import {
 import { METHODS, STATUS } from '../lib/types'
 import type { Appointment, AppointmentService, Currency, Method, Status } from '../lib/types'
 import { Button, Field, Modal } from './ui'
+import { CustomerPicker } from './CustomerPicker'
 
 export function AppointmentForm({
   appointment,
@@ -26,12 +27,14 @@ export function AppointmentForm({
   initialDay,
   onClose,
   onSaved,
+  repeatFrom,
 }: {
   appointment?: Appointment
   initialCustomer?: string
   initialDay?: string
   onClose: () => void
   onSaved?: (id: string) => void
+  repeatFrom?: Appointment
 }) {
   const { appointmentData, workspace: selectedWorkspace, workspaces, refresh } = useData()
   const [customerId, setCustomerId] = useState(appointment?.customer_id ?? initialCustomer ?? '')
@@ -53,9 +56,32 @@ export function AppointmentForm({
       : '')
   const [customerName, setCustomerName] = useState('')
   const [phone, setPhone] = useState('')
-  const [currency, setCurrency] = useState<Currency>(appointment?.currency ?? 'ARS')
-  const [lines, setLines] = useState<AppointmentService[]>(
-    appointment ? data.appointmentServices.filter((l) => l.appointment_id === appointment.id) : [],
+  const [currency, setCurrency] = useState<Currency>(
+    appointment?.currency ?? repeatFrom?.currency ?? 'ARS',
+  )
+  const [lines, setLines] = useState<AppointmentService[]>(() =>
+    appointment
+      ? data.appointmentServices.filter((l) => l.appointment_id === appointment.id)
+      : repeatFrom
+        ? data.appointmentServices
+            .filter((l) => l.appointment_id === repeatFrom.id)
+            .flatMap((line) => {
+              const service = data.services.find(
+                (s) => s.id === line.service_id && s.active && !s.deleted_at,
+              )
+              return service
+                ? [
+                    {
+                      service_id: service.id,
+                      name: service.name,
+                      price_cents:
+                        repeatFrom.currency === 'ARS' ? service.price_ars : service.price_usd,
+                      duration_minutes: service.duration_minutes,
+                    },
+                  ]
+                : []
+            })
+        : [],
   )
   const [customAmount, setCustomAmount] = useState<string | null>(() => {
     const subtotal = lines.reduce((sum, line) => sum + line.price_cents, 0)
@@ -69,7 +95,9 @@ export function AppointmentForm({
     amount.trim() && Number.isFinite(Number(amount))
       ? subtotal - Math.round(Number(amount) * 100)
       : 0
-  const [minutes, setMinutes] = useState(appointment?.duration_minutes ?? 60)
+  const [minutes, setMinutes] = useState(
+    appointment?.duration_minutes ?? (lines.reduce((sum, l) => sum + l.duration_minutes, 0) || 60),
+  )
   const [date, setDate] = useState(
     appointment ? zoned(appointment.starts_at, 'yyyy-MM-dd') : (initialDay ?? today()),
   )
@@ -236,12 +264,20 @@ export function AppointmentForm({
   }
   return (
     <Modal
-      title={appointment ? 'Editar turno' : 'Agendar nuevo turno'}
+      title={appointment ? 'Editar turno' : repeatFrom ? 'Repetir trabajo' : 'Agendar nuevo turno'}
       onClose={close}
       wide
       busy={busy}
     >
       <form className="appointment-form" onSubmit={save} onChange={() => setDirty(true)}>
+        {repeatFrom ? (
+          <p className="inline-info">
+            Nuevo turno con los servicios disponibles y precios actuales del catálogo. Revisá fecha
+            y precio antes de guardar. El anterior era de{' '}
+            {money(repeatFrom.total_cents, repeatFrom.currency)}. No se copian cobros, notas ni
+            estados.
+          </p>
+        ) : null}
         <div className="form-section-title">
           <UserRound size={17} />
           <h3>Cliente</h3>
@@ -282,19 +318,21 @@ export function AppointmentForm({
             </Field>
           </div>
         ) : (
-          <Field label="Cliente registrado">
-            <select required value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
-              <option value="">Seleccionar cliente…</option>
-              {(appointment ? data.customers : appointmentData.customers)
-                .filter((c) => !c.deleted_at || c.id === appointment?.customer_id)
-                .toSorted((a, b) => a.full_name.localeCompare(b.full_name))
-                .map((c) => (
-                  <option value={c.id} key={c.id}>
-                    {c.full_name} · {c.phone || 'Sin teléfono'}
-                  </option>
-                ))}
-            </select>
-          </Field>
+          <CustomerPicker
+            customers={data.customers
+              .filter((c) => !c.deleted_at || c.id === appointment?.customer_id)
+              .toSorted((a, b) => a.full_name.localeCompare(b.full_name))}
+            value={customerId}
+            onChange={(id) => {
+              setCustomerId(id)
+              setDirty(true)
+            }}
+            onCreate={(name) => {
+              setCustomerName(name)
+              setNewCustomer(true)
+              setDirty(true)
+            }}
+          />
         )}
         <div className="form-section-title">
           <Check size={17} />
@@ -386,20 +424,6 @@ export function AppointmentForm({
           {time} a {zoned(endTime({ starts_at: startsAt, duration_minutes: minutes }), 'HH:mm')} ·{' '}
           {duration(minutes)}
         </div>
-        <Field
-          label="Diferencia de hora con Argentina"
-          hint="En horas: −2 si está dos horas atrás, +4 si está cuatro horas adelante. Vacío o 0 usa la hora argentina. Se recuerda para los comprobantes de este cliente."
-        >
-          <input
-            type="text"
-            inputMode="decimal"
-            value={offset}
-            onChange={(e) =>
-              setOffsetEdits((values) => ({ ...values, [offsetKey]: e.target.value }))
-            }
-            placeholder="0"
-          />
-        </Field>
         {overlap && status !== 'cancelled' ? (
           <div className="warning">
             Este horario coincide con otro turno.
@@ -408,27 +432,48 @@ export function AppointmentForm({
               : ' Elegí otro horario o habilitá superposiciones en Ajustes.'}
           </div>
         ) : null}
-        <div className="form-grid">
-          <Field label="Estado">
-            <select value={status} onChange={(e) => setStatus(e.target.value as Status)}>
-              {Object.entries(STATUS).map(([v, text]) => (
-                <option value={v} key={v}>
-                  {text}
-                </option>
-              ))}
-            </select>
+        <details className="form-disclosure">
+          <summary>
+            Más opciones · {STATUS[status]} ·{' '}
+            {data.profiles.find((p) => p.id === responsible)?.full_name ?? 'Responsable'}
+            {offset ? ` · Hora del cliente: ${offset} h` : ''}
+          </summary>
+          <Field
+            label="Diferencia de hora con Argentina"
+            hint="En horas: −2 si está dos horas atrás, +4 si está cuatro horas adelante. Vacío o 0 usa la hora argentina. Se recuerda para los comprobantes de este cliente."
+          >
+            <input
+              type="text"
+              inputMode="decimal"
+              value={offset}
+              onChange={(e) =>
+                setOffsetEdits((values) => ({ ...values, [offsetKey]: e.target.value }))
+              }
+              placeholder="0"
+            />
           </Field>
-          <Field label="Responsable">
-            <select required value={responsible} onChange={(e) => setResponsible(e.target.value)}>
-              <option value="">Seleccionar integrante…</option>
-              {data.profiles.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.full_name}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </div>
+          <div className="form-grid">
+            <Field label="Estado">
+              <select value={status} onChange={(e) => setStatus(e.target.value as Status)}>
+                {Object.entries(STATUS).map(([v, text]) => (
+                  <option value={v} key={v}>
+                    {text}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Responsable">
+              <select required value={responsible} onChange={(e) => setResponsible(e.target.value)}>
+                <option value="">Seleccionar integrante…</option>
+                {data.profiles.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.full_name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+        </details>
         <div className="form-section-title">
           <Wallet size={17} />
           <h3>Importe acordado</h3>
@@ -517,14 +562,17 @@ export function AppointmentForm({
             Los cobros y devoluciones se administran desde el detalle del turno.
           </div>
         )}
-        <Field label="Notas adicionales">
-          <textarea
-            rows={2}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Acceso remoto, indicaciones o detalles del trabajo…"
-          />
-        </Field>
+        <details className="form-disclosure" open={Boolean(appointment?.notes) || undefined}>
+          <summary>Notas adicionales{notes ? ' · Con notas' : ''}</summary>
+          <Field label="Notas adicionales">
+            <textarea
+              rows={2}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Acceso remoto, indicaciones o detalles del trabajo…"
+            />
+          </Field>
+        </details>
         {error ? (
           <p className="form-error" role="alert">
             {error}

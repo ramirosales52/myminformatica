@@ -50,9 +50,17 @@ export function Modal({
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null
     const previousOverflow = document.body.style.overflow
+    // Al cobrar desde el historial del cliente puede haber un diálogo debajo.
+    const covered = [...document.querySelectorAll<HTMLElement>('.modal-backdrop')].filter(
+      (element) => element !== ref.current?.parentElement && !element.inert,
+    )
+    covered.forEach((element) => {
+      element.inert = true
+    })
     document.body.style.overflow = 'hidden'
     ref.current?.focus()
     const keydown = (event: KeyboardEvent) => {
+      if (ref.current?.closest('[inert]')) return
       if (event.key === 'Escape' && !controls.current.busy) controls.current.onClose()
       if (event.key === 'Tab') {
         const nodes = ref.current?.querySelectorAll<HTMLElement>(
@@ -83,6 +91,9 @@ export function Modal({
     return () => {
       document.body.style.overflow = previousOverflow
       document.removeEventListener('keydown', keydown)
+      covered.forEach((element) => {
+        element.inert = false
+      })
       previous?.focus()
     }
   }, [])

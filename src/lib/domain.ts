@@ -81,6 +81,9 @@ export const paidFor = (id: string, payments: Payment[]) =>
 export const paymentState = (total: number, paid: number) =>
   paid >= total ? 'paid' : paid > 0 ? 'partial' : 'unpaid'
 export const PAYMENT_STATUS = { paid: 'Pagado', partial: 'Pago parcial', unpaid: 'No pagado' }
+// El 50% es un objetivo acumulado, no otro cobro de media tarifa.
+export const quickChargeAmount = (total: number, paid: number, target: 'half' | 'balance') =>
+  Math.max(0, (target === 'half' ? Math.round(total / 2) : total) - paid)
 export const duration = (minutes: number) =>
   minutes < 60
     ? `${minutes} min`

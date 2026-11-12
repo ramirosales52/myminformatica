@@ -13,6 +13,7 @@ import {
   Wallet,
 } from 'lucide-react'
 import { useData } from '../providers/DataProvider'
+import type { OnAppointmentAction } from '../lib/appointmentActions'
 import { useAuth } from '../providers/AuthProvider'
 import { configured } from '../lib/supabase'
 import { initials, money, shiftDay, signedAmount, today, totals, zoned } from '../lib/domain'
@@ -29,11 +30,13 @@ export function Dashboard({
   onCustomer,
   onSelect,
   navigate,
+  onAction,
 }: {
   onNew: () => void
   onCustomer: () => void
   onSelect: (id: string) => void
   navigate: (page: Page, day?: string) => void
+  onAction?: OnAppointmentAction
 }) {
   const { data, schedule, workspace } = useData()
   const { session } = useAuth()
@@ -160,7 +163,12 @@ export function Dashboard({
               {ready ? 'Actualización automática' : 'Sin conectar'}
             </span>
           </div>
-          <AppointmentList appointments={todays} onSelect={onSelect} onNew={onNew} />
+          <AppointmentList
+            appointments={todays}
+            onSelect={onSelect}
+            onNew={onNew}
+            onAction={onAction}
+          />
           <div className="panel-footer">
             <Clock3 size={14} />
             Argentina · UTC−3

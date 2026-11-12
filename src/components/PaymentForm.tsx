@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import { useData } from '../providers/DataProvider'
 import { useToast } from '../providers/ToastProvider'
 import { messageFor, rpc } from '../lib/supabase'
-import { localInput, money, paidFor, toCents, toUTC } from '../lib/domain'
+import { localInput, money, paidFor, quickChargeAmount, toCents, toUTC } from '../lib/domain'
 import { KINDS, METHODS } from '../lib/types'
 import type { Appointment, Method, PaymentKind } from '../lib/types'
 import { Button, Field, Modal } from './ui'
@@ -110,19 +110,25 @@ export function PaymentForm({
           <Button
             variant="secondary"
             type="button"
+            disabled={
+              refund ? paid <= 0 : quickChargeAmount(appointment.total_cents, paid, 'half') <= 0
+            }
             onClick={() =>
               setAmount(
                 String(
-                  Math.min(refund ? paid : pending, Math.round(appointment.total_cents / 2)) / 100,
+                  (refund
+                    ? Math.min(paid, Math.round(appointment.total_cents / 2))
+                    : quickChargeAmount(appointment.total_cents, paid, 'half')) / 100,
                 ),
               )
             }
           >
-            50% del servicio
+            {refund ? 'Devolver 50% del servicio' : 'Completar al 50%'}
           </Button>
           <Button
             variant="secondary"
             type="button"
+            disabled={(refund ? paid : pending) <= 0}
             onClick={() => setAmount(String((refund ? paid : pending) / 100))}
           >
             {refund ? 'Devolver todo' : 'Cobrar saldo completo'}

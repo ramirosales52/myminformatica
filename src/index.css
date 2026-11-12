@@ -34,7 +34,7 @@
 }
 body {
   margin: 0;
-  min-width: 360px;
+  min-width: 320px;
 }
 button,
 input,
@@ -5629,6 +5629,304 @@ tbody > tr:hover {
   }
   .auth-form-wrap > h1 {
     font-size: 31px;
+  }
+}
+/* La agenda es una superficie de trabajo: datos legibles y acciones en el lugar. */
+.appointment-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid #243149;
+  padding: 12px 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #5378ff #101a2c;
+}
+.appointment-card:last-child {
+  border-bottom: 0;
+}
+.appointment-card .appointment-row {
+  flex: 1 0 470px;
+  min-width: 470px;
+  width: auto;
+  border: 0;
+  gap: 12px;
+  padding: 0;
+  flex-wrap: nowrap;
+}
+.appointment-card .appointment-row > .avatar,
+.appointment-card .row-arrow {
+  display: none;
+}
+.appointment-quick-actions {
+  flex: 0 0 auto;
+}
+.appointment-card .appointment-time {
+  width: 52px;
+}
+.appointment-card .appointment-time strong {
+  font-size: 16px;
+}
+.appointment-card .appointment-time > span {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.appointment-card .appointment-main > strong {
+  font-size: 14px;
+  line-height: 1.5;
+}
+.appointment-card .appointment-main > span {
+  font-size: 12px;
+  max-width: none;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.appointment-card .appointment-state {
+  min-width: 94px;
+}
+.appointment-card .appointment-state .badge {
+  font-size: 11px;
+  padding: 6px 8px;
+}
+.appointment-card .payment-text {
+  font-size: 12px;
+}
+.appointment-card .appointment-amount {
+  min-width: 140px;
+}
+.appointment-card .appointment-amount > strong {
+  font-size: 14px;
+}
+.appointment-card .appointment-amount > span {
+  font-size: 12px;
+  max-width: none;
+  line-height: 1.6;
+  color: #8e9bb3;
+}
+.appointment-card .appointment-amount > .appointment-pending {
+  color: #e8c38d;
+}
+.appointment-action-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+.appointment-action-bar .btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  min-width: 44px;
+  min-height: 44px;
+  font-size: 12px;
+  padding: 9px 12px;
+}
+.appointment-action-bar .appointment-status-select {
+  flex: 0 0 auto;
+  width: 150px;
+  min-height: 44px;
+  font-size: 13px;
+}
+.quick-payment-confirmation fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.quick-payment-methods > div,
+.agenda-shortcuts {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.quick-payment-methods button,
+.agenda-shortcuts button {
+  border: 1px solid #31466a;
+  background: #101a2c;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+.quick-payment-methods button[aria-pressed='true'],
+.agenda-shortcuts button[aria-pressed='true'] {
+  background: #5378ff24;
+  border-color: #7895ff;
+  color: #edf2fc;
+}
+.quick-payment-amount {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  justify-content: center;
+}
+.quick-payment-amount span {
+  color: #b9c9e6;
+  font-size: 13px;
+}
+.quick-payment-amount strong {
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+.quick-payment-methods {
+  margin-top: 20px;
+}
+.quick-payment-methods > span {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: #b9c9e6;
+}
+.quick-payment-confirmation .small {
+  font-size: 12px;
+  line-height: 1.6;
+  margin-top: 12px;
+}
+.quick-payment-confirmation .field > span,
+.appointment-form .field > span {
+  font-size: 13px;
+}
+.quick-payment-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+.agenda-shortcuts {
+  padding: 0 22px 18px;
+}
+.form-disclosure {
+  border: 1px solid #243149;
+  border-radius: 10px;
+  padding: 0 14px;
+  margin: 14px 0;
+}
+.form-disclosure > summary {
+  padding: 14px 0;
+  min-height: 44px;
+  font-size: 13px;
+  color: #b9c9e6;
+  cursor: pointer;
+  line-height: 1.6;
+}
+.form-disclosure[open] {
+  padding-bottom: 14px;
+}
+.form-disclosure .field {
+  margin-top: 12px;
+}
+.customer-picker {
+  position: relative;
+  margin-bottom: 16px;
+}
+.customer-picker > input {
+  width: 100%;
+  min-height: 44px;
+}
+.customer-picker-options {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-height: 300px;
+  overflow: auto;
+  z-index: 25;
+  background: #101a2c;
+  border: 1px solid #31466a;
+  border-radius: 10px;
+  box-shadow: 0 12px 30px #0008;
+  padding: 6px;
+}
+.customer-picker-options button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px;
+  text-align: left;
+  border-radius: 6px;
+  font-size: 14px;
+}
+.customer-picker-options button[aria-selected='true'],
+.customer-picker-options button:hover {
+  background: #5378ff24;
+}
+.customer-picker-options small {
+  color: #8e9bb3;
+  font-size: 12px;
+}
+.form-disclosure summary:focus-visible {
+  outline: 2px solid #7895ff;
+  outline-offset: 3px;
+}
+@media (max-width: 760px) {
+  .appointment-list {
+    padding: 0 16px;
+  }
+  .appointment-card .appointment-row {
+    flex: 0 0 280px;
+    min-width: 280px;
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr);
+    column-gap: 12px;
+    row-gap: 10px;
+    align-items: start;
+  }
+  .appointment-card .appointment-time {
+    grid-column: 1;
+    grid-row: 1 / 4;
+    width: auto;
+  }
+  .appointment-card .appointment-main {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+  }
+  .appointment-card .appointment-state {
+    grid-column: 2;
+    grid-row: 2;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .appointment-card .appointment-amount {
+    grid-column: 2;
+    grid-row: 3;
+    text-align: left;
+    min-width: 0;
+    margin: 0;
+  }
+  .appointment-card .appointment-amount > span {
+    margin-top: 3px;
+  }
+  .appointment-card .appointment-row > .avatar,
+  .appointment-card .row-arrow {
+    display: none;
+  }
+  .appointment-card .appointment-state .badge i {
+    width: 5px;
+    height: 5px;
+  }
+  .appointment-action-bar {
+    gap: 4px;
+  }
+  .appointment-action-bar .btn {
+    font-size: 12px;
+    padding: 9px;
+  }
+  .quick-payment-confirmation .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .quick-payment-confirmation input,
+  .customer-picker > input {
+    font-size: 16px;
+  }
+  .agenda-shortcuts {
+    padding: 0 16px 16px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

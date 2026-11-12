@@ -32,17 +32,21 @@ import { useAuth } from './providers/AuthProvider'
 import { useData } from './providers/DataProvider'
 import { useToast } from './providers/ToastProvider'
 import { configured, db, messageFor } from './lib/supabase'
-import { initials, zoned } from './lib/domain'
+import { initials, today, zoned } from './lib/domain'
+import type { OnAppointmentAction } from './lib/appointmentActions'
 import type { Appointment, Customer } from './lib/types'
 import type { Page } from './lib/navigation'
 import { AppointmentDetails } from './components/AppointmentDetails'
 import { AppointmentForm } from './components/AppointmentForm'
 import { CustomerForm } from './components/CustomerForm'
 import { PaymentForm } from './components/PaymentForm'
+import { RescheduleForm } from './components/RescheduleForm'
+import { AppointmentMessage } from './components/AppointmentMessage'
 import { Button, Empty } from './components/ui'
 import { AuthPage, Brand } from './pages/Auth'
 import { Dashboard } from './pages/Dashboard'
 import { Agenda } from './pages/Agenda'
+import type { AgendaState } from './pages/Agenda'
 import { Customers, CustomerDetails } from './pages/Customers'
 const Services = lazy(() => import('./pages/Services').then((m) => ({ default: m.Services })))
 const Messages = lazy(() => import('./pages/Messages').then((m) => ({ default: m.Messages })))
@@ -60,9 +64,15 @@ const NAV = [
   { id: 'settings', label: 'Ajustes', icon: Settings2 },
 ] as const
 type Overlay =
-  | { kind: 'appointment'; appointment?: Appointment; customerId?: string; day?: string }
+  | {
+      kind: 'appointment'
+      appointment?: Appointment
+      repeatFrom?: Appointment
+      customerId?: string
+      day?: string
+    }
   | { kind: 'details'; id: string }
-  | { kind: 'payment' | 'receipt'; appointment: Appointment }
+  | { kind: 'payment' | 'receipt' | 'reschedule' | 'message'; appointment: Appointment }
   | { kind: 'customer'; customer?: Customer }
   | { kind: 'customerDetails'; customer: Customer }
   | null
@@ -104,7 +114,16 @@ function WorkspaceApp() {
   const notify = useToast()
   const queryClient = useQueryClient()
   const [page, setPage] = useState<Page>(initialPage)
-  const [agendaDay, setAgendaDay] = useState<string>()
+  const [agendaState, setAgendaState] = useState<AgendaState>(() => ({
+    day: today(),
+    view: 'week',
+    search: '',
+    status: 'all',
+    service: 'all',
+    responsible: 'all',
+    payment: 'all',
+    filters: false,
+  }))
   const [overlay, setOverlay] = useState<Overlay>(null)
   const [mobile, setMobile] = useState(false)
   const [compact, setCompact] = useState(() => window.matchMedia('(max-width: 760px)').matches)
@@ -156,7 +175,7 @@ function WorkspaceApp() {
     }
   }, [])
   function navigate(next: Page, day?: string) {
-    setAgendaDay(day)
+    if (next === 'agenda' && day) setAgendaState((state) => ({ ...state, day, view: 'day' }))
     setInitialSearch('')
     setPage(next)
     setMobile(false)
@@ -190,6 +209,17 @@ function WorkspaceApp() {
   function selectAppointment(id: string) {
     setOverlay({ kind: 'details', id })
     setSearchOpen(false)
+  }
+  const appointmentAction: OnAppointmentAction = (action, appointment) => {
+    if (['edit', 'reschedule', 'repeat', 'payment'].includes(action) && !requireConnection()) return
+    if (action === 'repeat')
+      setOverlay({
+        kind: 'appointment',
+        repeatFrom: appointment,
+        customerId: appointment.customer_id,
+      })
+    else if (action === 'edit') setOverlay({ kind: 'appointment', appointment })
+    else setOverlay({ kind: action, appointment })
   }
   async function signOut() {
     try {
@@ -604,13 +634,15 @@ function WorkspaceApp() {
                 onCustomer={newCustomer}
                 onSelect={selectAppointment}
                 navigate={navigate}
+                onAction={appointmentAction}
               />
             ) : page === 'agenda' ? (
               <Agenda
-                key={agendaDay ?? 'agenda'}
-                initialDay={agendaDay}
+                savedState={agendaState}
+                onStateChange={setAgendaState}
                 onNew={newAppointment}
                 onSelect={selectAppointment}
+                onAction={appointmentAction}
               />
             ) : page === 'customers' ? (
               <Customers
@@ -654,6 +686,7 @@ function WorkspaceApp() {
             appointment={overlay.appointment}
             initialCustomer={overlay.customerId}
             initialDay={overlay.day}
+            repeatFrom={overlay.repeatFrom}
             onClose={closeOverlay}
           />
         ) : overlay?.kind === 'details' ? (
@@ -663,6 +696,16 @@ function WorkspaceApp() {
             onEdit={(appointment) => setOverlay({ kind: 'appointment', appointment })}
             onPayment={(appointment) => setOverlay({ kind: 'payment', appointment })}
             onReceipt={(appointment) => setOverlay({ kind: 'receipt', appointment })}
+          />
+        ) : overlay?.kind === 'reschedule' ? (
+          <RescheduleForm appointment={overlay.appointment} onClose={closeOverlay} />
+        ) : overlay?.kind === 'message' ? (
+          <AppointmentMessage
+            appointment={
+              appointmentData.appointments.find((a) => a.id === overlay.appointment.id) ??
+              overlay.appointment
+            }
+            onClose={closeOverlay}
           />
         ) : overlay?.kind === 'payment' ? (
           <PaymentForm
@@ -694,6 +737,7 @@ function WorkspaceApp() {
               setOverlay({ kind: 'appointment', customerId: customer.id })
             }
             onAppointment={selectAppointment}
+            onAction={appointmentAction}
           />
         ) : null}
       </Suspense>

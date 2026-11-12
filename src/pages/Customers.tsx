@@ -15,6 +15,7 @@ import { useToast } from '../providers/ToastProvider'
 import { db, messageFor } from '../lib/supabase'
 import { initials, money, paidFor, signedAmount, whatsappUrl, zoned } from '../lib/domain'
 import type { Customer } from '../lib/types'
+import type { OnAppointmentAction } from '../lib/appointmentActions'
 import { AppointmentList } from '../components/AppointmentList'
 import { Button, Empty, Modal, PageHeading } from '../components/ui'
 
@@ -170,12 +171,14 @@ export function CustomerDetails({
   onEdit,
   onNewAppointment,
   onAppointment,
+  onAction,
 }: {
   customer: Customer
   onClose: () => void
   onEdit: (c: Customer) => void
   onNewAppointment: (c: Customer) => void
   onAppointment: (id: string) => void
+  onAction?: OnAppointmentAction
 }) {
   const { appointmentData: data, refresh } = useData()
   const notify = useToast()
@@ -279,6 +282,7 @@ export function CustomerDetails({
         appointments={appointments.filter((a) => !a.deleted_at)}
         onSelect={onAppointment}
         showDate
+        onAction={onAction}
       />
     </Modal>
   )
