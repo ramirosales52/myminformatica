@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   CalendarDays,
-  Check,
+  Clock3,
   Copy,
   Download,
   FileText,
@@ -9,7 +9,8 @@ import {
   LockKeyhole,
   MessageCircle,
   Monitor,
-  ReceiptText,
+  UserRound,
+  Wrench,
 } from 'lucide-react'
 import { useData } from '../providers/DataProvider'
 import { useToast } from '../providers/ToastProvider'
@@ -20,14 +21,12 @@ import {
   duration,
   money,
   paidFor,
-  PAYMENT_STATUS,
   paymentState,
   shifted,
   utcOffsetLabel,
   whatsappUrl,
   zoned,
 } from '../lib/domain'
-import { STATUS } from '../lib/types'
 import type { Appointment } from '../lib/types'
 import { Button, Modal } from './ui'
 
@@ -205,37 +204,30 @@ export function Receipt({
               <span>ATENCIÓN REMOTA · ARGENTINA</span>
             </div>
           </div>
-          <div className={`receipt-status status-${appointment.status}`}>
-            <span className="receipt-check">
-              {appointment.status === 'cancelled' ? (
-                <CalendarDays size={28} />
-              ) : (
-                <Check size={30} />
-              )}
+          <div className="receipt-status">
+            <h2>Comprobante de turno</h2>
+            <span className={`badge status-${appointment.status}`}>
+              <i aria-hidden="true" />
+              {titles[appointment.status]}
             </span>
-            <h2>{titles[appointment.status]}</h2>
-            <p>{appointment.reference}</p>
           </div>
-          <div className="receipt-customer">
-            <small>PREPARADO PARA</small>
-            <h3>{customer?.full_name}</h3>
-          </div>
-          <div className="receipt-grid">
+          <div className="receipt-schedule">
             <div>
-              <small>{offset ? 'Fecha en tu país' : 'Fecha'}</small>
+              <small>
+                <CalendarDays size={15} />
+                {offset ? 'Fecha en tu país' : 'Fecha del turno'}
+              </small>
               <strong>{zoned(shifted(appointment.starts_at, offset), 'dd/MM/yyyy')}</strong>
             </div>
             <div>
-              <small>{offset ? 'Horario en tu país' : 'Horario'}</small>
+              <small>
+                <Clock3 size={15} />
+                {offset ? 'Horario en tu país' : 'Horario'}
+              </small>
               <strong>{zoned(shifted(appointment.starts_at, offset), 'HH:mm')} h</strong>
-            </div>
-            <div>
-              <small>Modalidad</small>
-              <strong>Remota</strong>
-            </div>
-            <div>
-              <small>Duración</small>
-              <strong>{duration(appointment.duration_minutes)}</strong>
+              <span className="receipt-timezone">
+                {offset ? `Tu horario (${utcOffsetLabel(offset)})` : 'Hora de Argentina (UTC−3)'}
+              </span>
             </div>
           </div>
           {offset ? (
@@ -244,16 +236,40 @@ export function Receipt({
               {utcOffsetLabel(offset)}
             </p>
           ) : null}
+          <div className="receipt-customer receipt-detail">
+            <UserRound size={18} aria-hidden="true" />
+            <div>
+              <small>Cliente</small>
+              <h3>{customer?.full_name}</h3>
+            </div>
+          </div>
           <div className="receipt-services">
-            <small>SERVICIOS ACORDADOS</small>
-            {lines.map((l, i) => (
-              <p key={i}>
-                <ReceiptText size={15} />
-                {l.name}
-              </p>
-            ))}
+            <div className="receipt-detail">
+              <Wrench size={18} aria-hidden="true" />
+              <div>
+                <small>Servicios</small>
+                <ul>
+                  {lines.map((l, i) => (
+                    <li key={i}>{l.name}</li>
+                  ))}
+                </ul>
+                <p className="receipt-modality">
+                  Remoto · {duration(appointment.duration_minutes)}
+                </p>
+              </div>
+            </div>
           </div>
           <div className="receipt-totals">
+            <div className="receipt-payment-heading">
+              <small>Resumen de pago</small>
+              <span className={`payment-pill ${state}`}>
+                {state === 'paid'
+                  ? 'Pago completo'
+                  : state === 'partial'
+                    ? 'Pago parcial'
+                    : 'Pago pendiente'}
+              </span>
+            </div>
             {subtotal > appointment.total_cents ? (
               <>
                 <p>
@@ -274,7 +290,7 @@ export function Receipt({
               <span>Monto abonado</span>
               <strong className="text-green">{money(paid, appointment.currency)}</strong>
             </p>
-            <p className="receipt-balance">
+            <p className={`receipt-balance ${state}`}>
               <span>Saldo pendiente</span>
               <strong>
                 {money(Math.max(0, appointment.total_cents - paid), appointment.currency)}
@@ -282,10 +298,10 @@ export function Receipt({
             </p>
           </div>
           <div className="receipt-footer">
-            <p>Datos al {zoned(generatedAt, 'dd/MM/yyyy HH:mm')} (Argentina)</p>
-            <span>
-              {STATUS[appointment.status]} · {PAYMENT_STATUS[state]}
-            </span>
+            <p className="receipt-reference">
+              Referencia: <strong>{appointment.reference}</strong>
+            </p>
+            <p>Emitido: {zoned(generatedAt, 'dd/MM/yyyy HH:mm')} · Argentina (UTC−3)</p>
             <p>
               {offset
                 ? `Tu horario: ${utcOffsetLabel(offset)} · Argentina: UTC−3`
