@@ -21,6 +21,58 @@ import {
   zoned,
 } from '../src/lib/domain'
 import type { Appointment, Payment } from '../src/lib/types'
+import type { ScheduledAppointment } from '../src/lib/types'
+import { calendarHours, daySegments, layoutSegments } from '../src/lib/calendarLayout'
+
+describe('Distribución horaria del calendario', () => {
+  const appointment = (id: string, time: string, minutes: number) =>
+    ({
+      id,
+      starts_at: `2026-11-12T${time}:00-03:00`,
+      duration_minutes: minutes,
+    }) as ScheduledAppointment
+
+  it('ubica horas y minutos en Argentina sin depender del huso del navegador', () => {
+    const segments = daySegments([appointment('a', '14:30', 90)], '2026-11-12')
+    expect(segments[0]).toMatchObject({ start: 870, end: 960 })
+    expect(calendarHours(segments)).toEqual(Array.from({ length: 12 }, (_, i) => i + 8))
+  })
+  it('divide los turnos que cruzan medianoche sin duplicarlos al terminar', () => {
+    const appointments = [appointment('a', '23:30', 90)]
+    expect(daySegments(appointments, '2026-11-12')[0]).toMatchObject({ start: 1410, end: 1440 })
+    expect(daySegments(appointments, '2026-11-13')[0]).toMatchObject({ start: 0, end: 60 })
+    expect(daySegments(appointments, '2026-11-14')).toEqual([])
+    expect(daySegments([appointment('b', '23:00', 60)], '2026-11-13')).toEqual([])
+  })
+  it('da columnas separadas a los simultáneos y reutiliza el espacio libre', () => {
+    const segments = daySegments(
+      [
+        appointment('a', '10:00', 120),
+        appointment('b', '10:30', 30),
+        appointment('c', '11:00', 60),
+        appointment('d', '12:00', 30),
+      ],
+      '2026-11-12',
+    )
+    const layout = layoutSegments(segments)
+    expect(layout.map(({ lane, lanes }) => [lane, lanes])).toEqual([
+      [0, 2],
+      [1, 2],
+      [1, 2],
+      [0, 1],
+    ])
+    expect(segments.every((segment) => segment.lanes === 1)).toBe(true)
+  })
+  it('extiende la grilla para horarios fuera de la jornada y admite días vacíos', () => {
+    expect(calendarHours([])).toHaveLength(12)
+    const hours = calendarHours(
+      daySegments([appointment('a', '06:15', 30), appointment('b', '22:30', 90)], '2026-11-12'),
+    )
+    expect(hours[0]).toBe(6)
+    expect(hours.at(-1)).toBe(23)
+    expect(layoutSegments([])).toEqual([])
+  })
+})
 
 const a = {
   id: 'a',

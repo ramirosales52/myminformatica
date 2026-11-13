@@ -78,7 +78,7 @@ test.beforeEach(async ({ page }) => {
         if(mode==='reschedule') child=React.createElement(RescheduleForm,{appointment:a,onClose:close});
         else if(mode==='message') child=React.createElement(AppointmentMessage,{appointment:a,onClose:close});
         else if(mode==='repeat'||mode==='form') child=React.createElement(AppointmentForm,{repeatFrom:mode==='repeat'?a:undefined,initialCustomer:mode==='repeat'?'c':undefined,onClose:close});
-        else if(mode==='agenda') child=React.createElement(Agenda,{onSelect:()=>{},onNew:()=>{}});
+        else if(mode==='agenda') child=React.createElement(Agenda,{onSelect:(id)=>{window.selected=id;},onNew:()=>{}});
         else child=React.createElement(AppointmentList,{appointments:[a],onSelect:()=>{window.selected=true;},onAction:(action)=>{window.action=action;}});
         root.render(React.createElement('main',{className:'panel',style:{maxWidth:900,margin:'16px auto'}},child));
       };
@@ -86,6 +86,75 @@ test.beforeEach(async ({ page }) => {
     </script></body></html>`,
     }),
   )
+})
+
+test('día destaca las horas y mueve la línea de ahora sin recargar', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-12T17:30:00Z') })
+  await page.goto('/__quick-agenda?mode=agenda')
+  await page.getByRole('button', { name: 'Día', exact: true }).click()
+  await page.clock.pauseAt(new Date('2026-11-12T17:30:10Z'))
+  const marker = page.locator('.timeline-now')
+  await expect(marker).toHaveAttribute('aria-label', 'Hora actual: 14:30')
+  await expect(marker.locator('time')).toHaveText('Ahora 14:30')
+  await expect(page.locator('.is-current-hour > time')).toHaveText('14:00')
+  await page.clock.runFor(60000)
+  await expect(marker).toHaveAttribute('aria-label', 'Hora actual: 14:31')
+  await page.getByRole('button', { name: 'Período siguiente' }).click()
+  await expect(marker).toHaveCount(0)
+  await page.getByRole('button', { name: 'Período anterior' }).click()
+  await expect(marker).toHaveCount(1)
+  await page.getByRole('textbox', { name: 'Buscar turnos' }).fill('sin coincidencias')
+  await expect(page.locator('.has-appointments')).toHaveCount(0)
+  await expect(marker).toHaveCount(1)
+})
+
+test('línea de ahora visible también fuera del horario habitual', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-12T08:15:00Z') })
+  await page.goto('/__quick-agenda?mode=agenda')
+  await page.getByRole('button', { name: 'Día', exact: true }).click()
+  await expect(page.locator('.is-current-hour > time')).toHaveText('05:00')
+  await expect(page.locator('.timeline-now')).toHaveAttribute('aria-label', 'Hora actual: 05:15')
+})
+
+test('semana posiciona el turno por hora y abre su detalle', async ({ page }) => {
+  await page.goto('/__quick-agenda?mode=agenda')
+  const grid = page.getByRole('region', { name: 'Calendario semanal por hora' })
+  await expect(grid.locator('.week-time-heading')).toHaveCount(7)
+  const event = grid.getByRole('button', { name: /Ana Pérez, 14:00 a 15:00/ })
+  await expect(event).toHaveCSS('top', '432px')
+  await expect(event).toHaveCSS('height', '72px')
+  await page.screenshot({ path: test.info().outputPath('semana.png') })
+  await event.click()
+  expect(await page.evaluate(() => (window as unknown as { selected: string }).selected)).toBe('a')
+  await page.getByRole('button', { name: 'Período siguiente' }).click()
+  await expect(grid.locator('.week-time-event')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Período anterior' }).click()
+  await expect(grid.locator('.week-time-event')).toHaveCount(1)
+  await page.getByRole('textbox', { name: 'Buscar turnos' }).fill('sin coincidencias')
+  await expect(grid.locator('.week-time-event')).toHaveCount(0)
+})
+
+test('día conserva cobros dentro del timeline y la semana no desborda en móvil', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/__quick-agenda?mode=agenda')
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  )
+  await page.getByRole('button', { name: 'Día', exact: true }).click()
+  const timeline = page.getByLabel('Línea de tiempo del día')
+  await expect(timeline.locator('.has-appointments > time')).toHaveText('14:00')
+  await page.screenshot({ path: test.info().outputPath('dia-movil.png'), fullPage: true })
+  await timeline.getByRole('button', { name: 'Completar al 50%', exact: true }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await page.getByRole('button', { name: 'Confirmar cobro' }).click()
+  await expect(timeline.getByText('Falta cobrar ARS 10.000')).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  )
+  await page.getByRole('button', { name: 'Mes', exact: true }).click()
+  await expect(page.locator('.month-view')).toBeVisible()
 })
 
 test('cobra lo que falta para el 50% sin abrir el detalle', async ({ page }) => {

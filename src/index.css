@@ -5631,6 +5631,229 @@ tbody > tr:hover {
     font-size: 31px;
   }
 }
+/* Vistas horarias: la semana conserva la escala; el día prioriza las acciones. */
+.day-timeline {
+  padding: 8px 22px 22px;
+}
+.timeline-hour {
+  position: relative;
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  min-height: 72px;
+}
+.timeline-hour > time {
+  padding-top: 14px;
+  color: #edf2fc;
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.timeline-hour.is-current-hour > time {
+  color: #93aaff;
+}
+.timeline-now {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  z-index: 2;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+.timeline-now > time {
+  flex-shrink: 0;
+  padding: 5px 7px;
+  border-radius: 6px;
+  background: #5378ff;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  box-shadow: 0 0 0 3px #101a2c;
+}
+.timeline-now > span {
+  height: 2px;
+  flex: 1;
+  background: #7895ff;
+  box-shadow: 0 0 0 2px #101a2c88;
+}
+.timeline-hour-content {
+  position: relative;
+  min-width: 0;
+  padding: 0 0 0 18px;
+  border-left: 2px solid #243149;
+  border-top: 1px solid #3b4d6b;
+}
+.has-appointments .timeline-hour-content::before {
+  content: '';
+  position: absolute;
+  top: 18px;
+  left: -5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #5378ff;
+}
+.timeline-hour-content .appointment-list {
+  padding: 0;
+}
+.timeline-free {
+  display: block;
+  padding-top: 16px;
+  font-size: 12px;
+  color: #8e9bb3;
+}
+.week-time-scroll {
+  max-height: 650px;
+  overflow: auto;
+  scrollbar-width: thin;
+  border-top: 1px solid #243149;
+  border-bottom: 1px solid #243149;
+}
+.week-time-grid {
+  display: grid;
+  grid-template-columns: 58px repeat(7, minmax(140px, 1fr));
+  min-width: 1038px;
+  isolation: isolate;
+}
+.week-time-corner,
+.week-time-heading {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #101a2c;
+  border-bottom: 1px solid #243149;
+  padding: 12px 4px;
+}
+.week-time-corner {
+  left: 0;
+  z-index: 5;
+  color: #8e9bb3;
+  font-size: 10px;
+  display: grid;
+  place-items: center;
+}
+.week-time-heading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  border-left: 1px solid #243149;
+}
+.week-time-heading > span {
+  text-transform: capitalize;
+  color: #8e9bb3;
+  font-size: 12px;
+}
+.week-time-heading > strong {
+  font-size: 20px;
+}
+.week-time-heading > small {
+  color: #8e9bb3;
+  font-size: 10px;
+}
+.week-time-heading[aria-pressed='true'] {
+  background: #152138;
+  box-shadow: inset 0 -3px #5378ff;
+}
+.week-time-heading.is-today > strong {
+  color: #93aaff;
+}
+.week-time-labels {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #101a2c;
+}
+.week-time-labels > time {
+  position: absolute;
+  right: 8px;
+  padding-top: 5px;
+  color: #8e9bb3;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.week-time-column {
+  position: relative;
+  border-left: 1px solid #243149;
+  background: repeating-linear-gradient(
+    to bottom,
+    #243149 0 1px,
+    transparent 1px 36px,
+    #24314966 36px 37px,
+    transparent 37px 72px
+  );
+}
+.week-time-column.is-selected {
+  background-color: #5378ff08;
+}
+.week-time-event {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  overflow: hidden;
+  text-align: left;
+  padding: 6px;
+  border: 1px solid #5378ff66;
+  border-left: 3px solid #5378ff;
+  border-radius: 6px;
+  background: #1b2b50;
+  color: #edf2fc;
+}
+.week-time-event:hover,
+.week-time-event:focus-visible {
+  background: #263c68;
+  z-index: 1;
+}
+.week-time-event > time {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.week-time-event > strong {
+  font-size: 12px;
+}
+.week-time-event > span,
+.week-time-event > small {
+  font-size: 10px;
+  color: #becbe1;
+}
+.week-time-event.status-completed {
+  border-left-color: #58d6aa;
+  background: #16382f;
+}
+.week-time-event.status-pending {
+  border-left-color: #e8c38d;
+}
+.week-time-event.status-cancelled {
+  border-left-color: #8e9bb3;
+  background: #202938;
+  text-decoration: line-through;
+}
+@media (max-width: 760px) {
+  .day-timeline {
+    padding: 8px 12px 16px;
+  }
+  .timeline-hour {
+    grid-template-columns: 62px minmax(0, 1fr);
+  }
+  .timeline-hour > time {
+    font-size: 15px;
+  }
+  .timeline-now > time {
+    font-size: 10px;
+    padding: 5px;
+  }
+  .timeline-hour-content {
+    padding-left: 10px;
+  }
+}
+
 /* La agenda es una superficie de trabajo: datos legibles y acciones en el lugar. */
 .appointment-card {
   display: flex;
@@ -5653,6 +5876,20 @@ tbody > tr:hover {
   gap: 12px;
   padding: 0;
   flex-wrap: nowrap;
+}
+.day-timeline .appointment-card {
+  flex-direction: column;
+  align-items: stretch;
+  overflow: visible;
+}
+.day-timeline .appointment-card .appointment-row {
+  flex: 0 0 auto;
+  min-width: 0;
+  width: 100%;
+  flex-wrap: wrap;
+}
+.day-timeline .appointment-action-bar {
+  flex-wrap: wrap;
 }
 .appointment-card .appointment-row > .avatar,
 .appointment-card .row-arrow {

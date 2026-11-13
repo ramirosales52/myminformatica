@@ -23,6 +23,8 @@ import {
 } from '../lib/domain'
 import { STATUS } from '../lib/types'
 import { AppointmentList } from '../components/AppointmentList'
+import { DayTimeline, WeekTimeGrid } from '../components/AgendaTimeline'
+import { daySegments } from '../lib/calendarLayout'
 import { Button, PageHeading } from '../components/ui'
 
 export interface AgendaState {
@@ -99,7 +101,7 @@ export function Agenda({
     )
   })
   const days = weekDays(day)
-  const selected = appointments.filter((a) => zoned(a.starts_at, 'yyyy-MM-dd') === day)
+  const selected = daySegments(appointments, day).map((segment) => segment.appointment)
   const countFilters = [status, service, responsible, payment].filter((v) => v !== 'all').length
   function step(n: number) {
     setDay(view === 'month' ? shiftMonth(day, n) : shiftDay(day, n * (view === 'week' ? 7 : 1)))
@@ -124,7 +126,11 @@ export function Agenda({
             <button className="icon-btn" aria-label="Período siguiente" onClick={() => step(1)}>
               <ChevronRight size={18} />
             </button>
-            <h2>{zoned(`${day}T12:00:00-03:00`, 'MMMM yyyy')}</h2>
+            <h2>
+              {view === 'week'
+                ? `${zoned(`${days[0]}T12:00:00-03:00`, 'd MMM')} – ${zoned(`${days[6]}T12:00:00-03:00`, 'd MMM yyyy')}`
+                : zoned(`${day}T12:00:00-03:00`, view === 'day' ? 'd MMMM yyyy' : 'MMMM yyyy')}
+            </h2>
             <Button variant="secondary" onClick={() => setDay(today())}>
               Hoy
             </Button>
@@ -138,6 +144,7 @@ export function Agenda({
               <button
                 key={v}
                 className={view === v ? 'active' : ''}
+                aria-pressed={view === v}
                 onClick={() => setView(v as typeof view)}
               >
                 {text}
@@ -264,26 +271,13 @@ export function Agenda({
           </div>
         ) : null}
         {view === 'week' ? (
-          <div className="week-strip">
-            {days.map((d) => (
-              <button
-                className={`${day === d ? 'active' : ''} ${d === today() ? 'is-today' : ''}`}
-                key={d}
-                onClick={() => setDay(d)}
-              >
-                <span>{zoned(`${d}T12:00:00-03:00`, 'EEE')}</span>
-                <strong>{Number(d.slice(8))}</strong>
-                <small>
-                  {
-                    appointments.filter(
-                      (a) => zoned(a.starts_at, 'yyyy-MM-dd') === d && a.status !== 'cancelled',
-                    ).length
-                  }{' '}
-                  turnos
-                </small>
-              </button>
-            ))}
-          </div>
+          <WeekTimeGrid
+            days={days}
+            day={day}
+            appointments={appointments}
+            onDay={setDay}
+            onSelect={onSelect}
+          />
         ) : null}
         {view === 'month' ? (
           <div className="month-view">
@@ -340,12 +334,22 @@ export function Agenda({
               <span className="count">{selected.length}</span>
               <span className="muted ml-auto small">Argentina · UTC−3</span>
             </div>
-            <AppointmentList
-              appointments={selected}
-              onSelect={onSelect}
-              onNew={() => onNew(day)}
-              onAction={onAction}
-            />
+            {view === 'day' ? (
+              <DayTimeline
+                day={day}
+                appointments={appointments}
+                onSelect={onSelect}
+                onNew={() => onNew(day)}
+                onAction={onAction}
+              />
+            ) : (
+              <AppointmentList
+                appointments={selected}
+                onSelect={onSelect}
+                onNew={() => onNew(day)}
+                onAction={onAction}
+              />
+            )}
           </>
         )}
         <div className="panel-footer">
