@@ -107,7 +107,7 @@ export function Agenda({
     setDay(view === 'month' ? shiftMonth(day, n) : shiftDay(day, n * (view === 'week' ? 7 : 1)))
   }
   return (
-    <div className="page">
+    <div className="page agenda-page">
       <PageHeading
         title="Agenda compartida"
         action={

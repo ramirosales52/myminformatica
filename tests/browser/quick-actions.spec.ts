@@ -96,7 +96,13 @@ test('día destaca las horas y mueve la línea de ahora sin recargar', async ({ 
   const marker = page.locator('.timeline-now')
   await expect(marker).toHaveAttribute('aria-label', 'Hora actual: 14:30')
   await expect(marker.locator('time')).toHaveText('Ahora 14:30')
+  await expect(marker.locator('span')).toHaveCSS('background-color', 'rgb(255, 82, 92)')
+  expect(await marker.evaluate((element) => parseFloat(getComputedStyle(element).top))).toBeCloseTo(
+    (await page.locator('.is-current-hour').boundingBox())!.height / 2,
+    1,
+  )
   await expect(page.locator('.is-current-hour > time')).toHaveText('14:00')
+  await expect(page.locator('.timeline-hour > time').last()).toHaveText('22:00')
   await page.clock.runFor(60000)
   await expect(marker).toHaveAttribute('aria-label', 'Hora actual: 14:31')
   await page.getByRole('button', { name: 'Período siguiente' }).click()
@@ -115,6 +121,73 @@ test('línea de ahora visible también fuera del horario habitual', async ({ pag
   await expect(page.locator('.is-current-hour > time')).toHaveText('05:00')
   await expect(page.locator('.timeline-now')).toHaveAttribute('aria-label', 'Hora actual: 05:15')
 })
+
+for (const width of [390, 1440]) {
+  test(`día muestra bloques separados con datos y acciones en una fila a ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 1000 })
+    await page.goto('/__quick-agenda?mode=agenda')
+    await page.getByRole('button', { name: 'Día', exact: true }).click()
+    const heading = page.getByRole('heading', { name: 'Agenda compartida' })
+    await expect(heading).toHaveCSS('font-size', width < 760 ? '19px' : '22px')
+    const shortcuts = page.getByRole('group', { name: 'Filtros rápidos' })
+    for (const button of await shortcuts.getByRole('button').all()) {
+      expect((await button.boundingBox())!.height).toBeLessThanOrEqual(30)
+    }
+    await page.evaluate(() => {
+      const fixture = window as unknown as {
+        fixture: {
+          schedule: { id: string; starts_at: string }[]
+          appointmentData: { appointments: { id: string; starts_at: string }[] }
+        }
+        render: () => void
+      }
+      const next = { ...fixture.fixture.schedule[0], id: 'b' }
+      next.starts_at = next.starts_at.replace('14:00', '14:30')
+      fixture.fixture.schedule.push(next)
+      fixture.fixture.appointmentData.appointments.push({
+        ...fixture.fixture.appointmentData.appointments[0],
+        id: next.id,
+        starts_at: next.starts_at,
+      })
+      fixture.render()
+    })
+    const timeline = page.getByLabel('Línea de tiempo del día')
+    const cards = timeline.locator('.appointment-card')
+    await expect(cards).toHaveCount(2)
+    await expect(timeline).toHaveCSS('border-top-width', '1px')
+    for (const card of await cards.all()) {
+      await expect(card).toHaveCSS('border-top-width', '1px')
+      const layout = await card.evaluate((element) => {
+        const row = element.querySelector('.appointment-row')!.getBoundingClientRect()
+        const actions = element.querySelector('.appointment-action-bar')!.getBoundingClientRect()
+        const controls = [
+          ...element.querySelectorAll(
+            '.appointment-action-bar button, .appointment-action-bar select',
+          ),
+        ].map((control) => control.getBoundingClientRect())
+        return {
+          centerDifference: Math.abs(row.y + row.height / 2 - actions.y - actions.height / 2),
+          sameLine: controls.every((control) => Math.abs(control.y - controls[0].y) < 2),
+          height: element.getBoundingClientRect().height,
+        }
+      })
+      expect(layout.centerDifference).toBeLessThan(2)
+      expect(layout.sameLine).toBe(true)
+      expect(layout.height).toBeLessThan(90)
+      await expect(card.getByRole('combobox', { name: 'Cambiar estado del turno' })).toBeVisible()
+    }
+    const first = (await cards.nth(0).boundingBox())!
+    const second = (await cards.nth(1).boundingBox())!
+    expect(second.y - first.y - first.height).toBeGreaterThanOrEqual(6)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false)
+    await page.screenshot({
+      path: test.info().outputPath(`dia-compacto-${width}.png`),
+      fullPage: true,
+    })
+  })
+}
 
 test('semana posiciona el turno por hora y abre su detalle', async ({ page }) => {
   await page.goto('/__quick-agenda?mode=agenda')

@@ -29,7 +29,7 @@ export function DayTimeline({
   const segments = daySegments(appointments, day)
   const hours = calendarHours(segments)
   const firstHour = isToday ? Math.min(hours[0], currentHour) : hours[0]
-  const lastHour = isToday ? Math.max(hours.at(-1)!, currentHour) : hours.at(-1)!
+  const lastHour = Math.max(22, hours.at(-1)!, isToday ? currentHour : 0)
   return (
     <div className="day-timeline" aria-label="Línea de tiempo del día">
       {!segments.length ? (
