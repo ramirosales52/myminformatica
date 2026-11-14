@@ -1,22 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import {
-  CalendarDays,
-  Clock3,
-  Copy,
-  Download,
-  FileText,
-  Link2,
-  LockKeyhole,
-  MessageCircle,
-  Monitor,
-  UserRound,
-  Wrench,
-} from 'lucide-react'
+import { CalendarDays, Clock3, Copy, Download, Monitor, UserRound, Wrench } from 'lucide-react'
 import { useData } from '../providers/DataProvider'
 import { useToast } from '../providers/ToastProvider'
-import { db, messageFor } from '../lib/supabase'
+import { messageFor } from '../lib/supabase'
 import {
-  customerSchedule,
   downloadFile,
   duration,
   money,
@@ -24,7 +11,6 @@ import {
   paymentState,
   shifted,
   utcOffsetLabel,
-  whatsappUrl,
   zoned,
 } from '../lib/domain'
 import type { Appointment } from '../lib/types'
@@ -42,10 +28,8 @@ export function Receipt({
   const notify = useToast()
   const ref = useRef<HTMLDivElement>(null)
   const [busy, setBusy] = useState(false)
-  const [link, setLink] = useState('')
-  const [sharePath, setSharePath] = useState('')
-  const [consent, setConsent] = useState(false)
-  // Una imagen y su mensaje deben describir la misma instantánea, incluso si otro integrante cobra mientras se genera.
+  const [hasLogo, setHasLogo] = useState(true)
+  // La imagen conserva la misma instantánea, incluso si otro integrante cobra mientras se genera.
   const [snapshot] = useState(() => ({
     appointment: latestAppointment,
     workspace: latestWorkspace,
@@ -58,6 +42,10 @@ export function Receipt({
   const subtotal = lines.reduce((sum, line) => sum + line.price_cents, 0)
   // El comprobante se lee en el país del cliente; la diferencia se carga a mano en el cliente.
   const offset = customer?.tz_offset_minutes ?? null
+  const tutorialText = `¡Hola! 👋 Te compartimos el comprobante de tu turno del ${zoned(
+    shifted(appointment.starts_at, offset),
+    "EEEE, d 'de' MMMM 'de' yyyy 'a las' HH:mm",
+  )} hs (${offset ? 'hora de tu país' : 'hora de Argentina'}).\n\n💻 Tutorial para instalar la app de conexión remota:\nhttps://drive.google.com/drive/folders/1RkQH8nKH_vJERmQ40d5jYTdgrAa4ib02\n\nCuando la tengas instalada, pasanos tu ID por este chat.\nM&M Informática`
   const stale =
     latestAppointment.version !== appointment.version ||
     latestWorkspace?.version !== workspace?.version ||
@@ -93,7 +81,7 @@ export function Receipt({
     }
     return cachedPng.current
   }
-  async function generate(format: 'png' | 'pdf' | 'share') {
+  async function downloadPng() {
     setBusy(true)
     try {
       const image = await png()
@@ -102,40 +90,27 @@ export function Receipt({
           'El turno cambió. Cerrá y volvé a abrir el comprobante para usar los datos actuales.',
         )
       const blob = await (await fetch(image)).blob()
-      if (format === 'png') downloadFile(blob, `${appointment.reference}.png`)
-      else if (format === 'pdf') {
-        const { jsPDF } = await import('jspdf')
-        const height = ref.current!.offsetHeight * (190 / ref.current!.offsetWidth)
-        const pdf = new jsPDF({ unit: 'mm', format: [210, Math.max(297, height + 20)] })
-        pdf.setFillColor('#080e1b')
-        pdf.rect(0, 0, 210, Math.max(297, height + 20), 'F')
-        pdf.addImage(image, 'PNG', 10, 10, 190, height)
-        pdf.save(`${appointment.reference}.pdf`)
-      } else {
-        if (!customer?.phone)
-          throw new Error('Agregá un teléfono al cliente para compartir por WhatsApp.')
-        if (!workspace || !customer || !consent)
-          throw new Error(
-            'Confirmá que querés compartir este comprobante mediante un enlace temporal.',
-          )
-        const path = `${workspace.id}/${appointment.id}/${crypto.randomUUID()}.png`
-        const uploaded = await db()
-          .storage.from('receipts')
-          .upload(path, blob, { contentType: 'image/png', upsert: false, cacheControl: '0' })
-        if (uploaded.error) throw uploaded.error
-        const signed = await db().storage.from('receipts').createSignedUrl(path, 3600)
-        if (signed.error) throw signed.error
-        setSharePath(path)
-        setLink(
-          whatsappUrl(
-            customer.phone,
-            `¡Hola ${customer.full_name}! 👋\n${titles[appointment.status]}\n📅 ${customerSchedule(appointment.starts_at, customer.tz_offset_minutes)}\n${lines.map((l) => l.name).join(' + ')}\nTotal: ${money(appointment.total_cents, appointment.currency)}\nAbonado: ${money(paid, appointment.currency)}\nSaldo: ${money(Math.max(0, appointment.total_cents - paid), appointment.currency)}\n\nTu comprobante (enlace válido por 1 hora):\n${signed.data.signedUrl}`,
-          ),
-        )
-        notify('Enlace temporal listo. Abrí WhatsApp para confirmar el envío.')
-      }
+      downloadFile(blob, `${appointment.reference}.png`)
     } catch (err) {
       notify(messageFor(err), true)
+    } finally {
+      setBusy(false)
+    }
+  }
+  async function copyTutorial() {
+    setBusy(true)
+    try {
+      if (!navigator.clipboard?.writeText)
+        throw new Error('Tu navegador no permite copiar texto al portapapeles.')
+      await navigator.clipboard.writeText(tutorialText)
+      notify('Tutorial copiado. Ya podés pegar el mensaje con el enlace al Drive.')
+    } catch (err) {
+      notify(
+        err instanceof DOMException && err.name === 'NotAllowedError'
+          ? 'No se pudo copiar el tutorial. Permití el acceso al portapapeles y reintentá.'
+          : messageFor(err),
+        true,
+      )
     } finally {
       setBusy(false)
     }
@@ -144,7 +119,7 @@ export function Receipt({
     setBusy(true)
     try {
       if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined')
-        throw new Error('Tu navegador no permite copiar imágenes. Podés descargar el PNG o PDF.')
+        throw new Error('Tu navegador no permite copiar imágenes. Podés descargar el PNG.')
       // Iniciar la escritura durante el clic; Safari pierde el permiso si esperamos a generar el PNG.
       const blob = png().then(async (image) => {
         const result = await (await fetch(image)).blob()
@@ -169,24 +144,8 @@ export function Receipt({
       setBusy(false)
     }
   }
-  async function revoke() {
-    setBusy(true)
-    try {
-      const { error } = await db().storage.from('receipts').remove([sharePath])
-      if (error) throw error
-      setLink('')
-      setSharePath('')
-      notify(
-        'Archivo compartido eliminado. La revocación puede tardar hasta un minuto en propagarse; no elimina copias ya descargadas.',
-      )
-    } catch (err) {
-      notify(messageFor(err), true)
-    } finally {
-      setBusy(false)
-    }
-  }
   return (
-    <Modal title="Comprobante del turno" onClose={onClose} busy={busy}>
+    <Modal title="Comprobante del turno" onClose={onClose} busy={busy} hideTitle>
       {stale ? (
         <p className="warning">
           El turno, el cliente o sus cobros cambiaron. Cerrá y volvé a abrir este comprobante para
@@ -197,10 +156,18 @@ export function Receipt({
         <div ref={ref} className="receipt">
           <div className="receipt-brand">
             <span className="brand-mark">
-              <Monitor size={22} />
+              {hasLogo ? (
+                <img
+                  src={`${import.meta.env.BASE_URL}branding/logo.png`}
+                  alt="Logo de M&M Informatica"
+                  onError={() => setHasLogo(false)}
+                />
+              ) : (
+                <Monitor size={22} />
+              )}
             </span>
             <div>
-              <strong>{workspace?.business_name || 'Servicio técnico remoto'}</strong>
+              <strong>M&M Informatica</strong>
               <span>ATENCIÓN REMOTA · ARGENTINA</span>
             </div>
           </div>
@@ -210,6 +177,13 @@ export function Receipt({
               <i aria-hidden="true" />
               {titles[appointment.status]}
             </span>
+          </div>
+          <div className="receipt-customer receipt-detail">
+            <UserRound size={18} aria-hidden="true" />
+            <div>
+              <small>Cliente</small>
+              <h3>{customer?.full_name}</h3>
+            </div>
           </div>
           <div className="receipt-schedule">
             <div>
@@ -228,19 +202,6 @@ export function Receipt({
               <span className="receipt-timezone">
                 {offset ? `Tu horario (${utcOffsetLabel(offset)})` : 'Hora de Argentina (UTC−3)'}
               </span>
-            </div>
-          </div>
-          {offset ? (
-            <p className="receipt-zone-note">
-              Argentina: {zoned(appointment.starts_at, 'dd/MM/yyyy HH:mm')} h (UTC−3) · Tu horario:{' '}
-              {utcOffsetLabel(offset)}
-            </p>
-          ) : null}
-          <div className="receipt-customer receipt-detail">
-            <UserRound size={18} aria-hidden="true" />
-            <div>
-              <small>Cliente</small>
-              <h3>{customer?.full_name}</h3>
             </div>
           </div>
           <div className="receipt-services">
@@ -301,13 +262,7 @@ export function Receipt({
             <p className="receipt-reference">
               Referencia: <strong>{appointment.reference}</strong>
             </p>
-            <p>Emitido: {zoned(generatedAt, 'dd/MM/yyyy HH:mm')} · Argentina (UTC−3)</p>
-            <p>
-              {offset
-                ? `Tu horario: ${utcOffsetLabel(offset)} · Argentina: UTC−3`
-                : 'Zona horaria: Argentina (UTC−3)'}
-            </p>
-            <p>Comprobante de coordinación y pago. No es una factura fiscal.</p>
+            <p>Emitido: {zoned(generatedAt, 'dd/MM/yyyy HH:mm')}</p>
             {workspace?.business_phone || workspace?.business_email ? (
               <p>
                 {[workspace.business_phone, workspace.business_email].filter(Boolean).join(' · ')}
@@ -323,66 +278,22 @@ export function Receipt({
         </Button>
         <Button
           variant="secondary"
-          onClick={() => void generate('png')}
+          onClick={() => void copyTutorial()}
+          loading={busy}
+          disabled={stale}
+        >
+          <Copy size={16} />
+          Copiar tutorial
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={() => void downloadPng()}
           loading={busy}
           disabled={stale}
         >
           <Download size={16} />
           Descargar PNG
         </Button>
-        <Button
-          variant="secondary"
-          onClick={() => void generate('pdf')}
-          loading={busy}
-          disabled={stale}
-        >
-          <FileText size={16} />
-          Descargar PDF
-        </Button>
-      </div>
-      <div className="share-receipt">
-        <p>
-          <LockKeyhole size={15} />
-          Enlace privado firmado · vence en 1 hora
-        </p>
-        <label className="checkbox-line">
-          <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
-          Autorizo crear un enlace temporal. Quien lo reciba podrá ver este comprobante durante una
-          hora.
-        </label>
-        {link ? (
-          <>
-            {!stale ? (
-              <a
-                className="btn btn-primary full"
-                href={link}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <MessageCircle size={17} />
-                Abrir WhatsApp y confirmar envío
-              </a>
-            ) : null}
-            <Button className="full" variant="ghost" onClick={() => void revoke()} loading={busy}>
-              Revocar enlace compartido
-            </Button>
-          </>
-        ) : (
-          <Button
-            className="full"
-            onClick={() => void generate('share')}
-            loading={busy}
-            disabled={!consent || stale || !customer?.phone}
-          >
-            <Link2 size={16} />
-            Preparar comprobante para WhatsApp
-          </Button>
-        )}
-        <small>
-          {customer?.phone
-            ? 'No se envían mensajes automáticamente.'
-            : 'Sin teléfono: podés copiar la imagen o descargar el comprobante en PNG o PDF.'}
-        </small>
       </div>
     </Modal>
   )

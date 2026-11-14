@@ -33,6 +33,7 @@ export function Modal({
   onClose,
   wide = false,
   busy = false,
+  hideTitle = false,
 }: {
   title: string
   subtitle?: string
@@ -40,6 +41,7 @@ export function Modal({
   onClose: () => void
   wide?: boolean
   busy?: boolean
+  hideTitle?: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const titleId = useId()
@@ -110,11 +112,12 @@ export function Modal({
         className={`modal ${wide ? 'modal-wide' : ''}`}
         role="dialog"
         aria-modal="true"
-        aria-labelledby={titleId}
+        aria-labelledby={hideTitle ? undefined : titleId}
+        aria-label={hideTitle ? title : undefined}
       >
         <div className="modal-heading">
           <div>
-            <h2 id={titleId}>{title}</h2>
+            {hideTitle ? null : <h2 id={titleId}>{title}</h2>}
             {subtitle ? <p>{subtitle}</p> : null}
           </div>
           <button

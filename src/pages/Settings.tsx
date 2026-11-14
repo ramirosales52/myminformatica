@@ -509,8 +509,8 @@ function ConnectionPanel() {
           WhatsApp. No hace falta configurar WhatsApp Business API.
         </p>
         <p className="muted">
-          Los comprobantes se descargan como PNG o PDF. Para compartirlos se crea un enlace firmado
-          que vence después de una hora. El bucket de Storage nunca es público.
+          Los comprobantes se pueden copiar como imagen o descargar como PNG para compartirlos
+          manualmente. No se crean enlaces temporales.
         </p>
       </section>
     </>

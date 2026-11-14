@@ -307,38 +307,7 @@ test('flujo diario completo con dos sesiones, comprobantes y persistencia real',
   expect(
     (await readFile('/tmp/opencode/agenda-comprobante.png')).subarray(0, 8).toString('hex'),
   ).toBe('89504e470d0a1a0a')
-  const pdf = page.waitForEvent('download')
-  await page.bringToFront()
-  await page.getByRole('button', { name: 'Descargar PDF', exact: true }).click()
-  const pdfFile = await pdf
-  expect(pdfFile.suggestedFilename()).toMatch(/\.pdf$/)
-  expect((await readFile((await pdfFile.path())!)).subarray(0, 5).toString()).toBe('%PDF-')
-  await page.getByRole('checkbox').check()
-  await page
-    .getByRole('button', { name: 'Preparar comprobante para WhatsApp', exact: true })
-    .click()
-  const share = page.getByRole('link', { name: 'Abrir WhatsApp y confirmar envío' })
-  await expect(share).toBeVisible()
-  const shareHref = await share.getAttribute('href')
-  expect(shareHref).toContain('5493510000999')
-  const text = new URL(shareHref!).searchParams.get('text')!
-  expect(text).toContain('enlace válido por 1 hora')
-  const signed = text.split('\n').at(-1)!
-  const result = await page.request.get(signed)
-  expect(result.ok()).toBe(true)
-  expect(result.headers()['content-type']).toContain('image/png')
-  const token = new URL(signed).searchParams.get('token')!
-  const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString())
-  expect(claims.exp * 1000 - Date.now()).toBeGreaterThan(3500000)
-  expect(claims.exp * 1000 - Date.now()).toBeLessThanOrEqual(3600000)
-  const publicUrl = signed.replace('/object/sign/', '/object/public/').split('?')[0]
-  const denied = await page.request.get(publicUrl)
-  expect(denied.ok()).toBe(false)
-  await page.getByRole('button', { name: 'Revocar enlace compartido', exact: true }).click()
-  await expect(
-    page.getByRole('button', { name: 'Revocar enlace compartido', exact: true }),
-  ).toHaveCount(0)
-  await expect.poll(async () => (await page.request.get(signed)).ok()).toBe(false)
+  await expect(page.locator('.share-receipt')).toHaveCount(0)
   await page.getByRole('button', { name: 'Cerrar ventana', exact: true }).click()
   await page.screenshot({ path: '/tmp/opencode/agenda-dashboard.png', fullPage: true })
   await page
@@ -558,16 +527,11 @@ test('un usuario sin membresías gestiona turnos ajenos con libertad total', asy
   await expect(row).toContainText('Pagado')
   await row.click()
   await dialog.getByRole('button', { name: 'Comprobante', exact: true }).click()
-  await expect(page.locator('.receipt')).toContainText('Negocio original del turno')
+  await expect(page.locator('.receipt')).toContainText('M&M Informatica')
   await expect(page.locator('.receipt')).toContainText('USD 123,45')
-  await page.getByRole('checkbox').check()
-  await page
-    .getByRole('button', { name: 'Preparar comprobante para WhatsApp', exact: true })
-    .click()
-  await expect(
-    page.getByRole('link', { name: 'Abrir WhatsApp y confirmar envío' }),
-  ).toHaveAttribute('href', /5493510000888/)
-  await page.getByRole('button', { name: 'Revocar enlace compartido', exact: true }).click()
+  const receiptDownload = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Descargar PNG', exact: true }).click()
+  expect((await receiptDownload).suggestedFilename()).toMatch(/\.png$/)
   await page.getByRole('button', { name: 'Cerrar ventana', exact: true }).click()
   const completed = await A.rpc('save_appointment', {
     p_workspace: workspace,
