@@ -38,10 +38,10 @@ Las suites crean cuentas y espacios de verificación y eliminan **solo sus UUID*
 ## Controles adicionales
 
 - Agenda y detalles operativos disponibles para integrantes, usuarios de otro espacio y una cuarta cuenta sin membresías. Acceso anónimo rechazado en lectura y RPC de escritura.
-- Operadores ajenos crean clientes/turnos, editan, reasignan responsables sin membresías, cobran, devuelven y eliminan lógicamente. Se conservan autoría, historial, versiones y validaciones económicas; administración, plantillas y escrituras directas siguen protegidas.
+- Todas las cuentas autenticadas operan clientes, turnos, cobros, plantillas y configuración del negocio sin roles ni membresías. Se conservan autoría, historial, versiones y validaciones económicas; las escrituras directas en pagos siguen protegidas.
 - Paginación estable de la agenda global; los cambios de estado se reflejan y los turnos eliminados dejan de mostrarse.
 - Navegador: cuenta sin membresías busca por teléfono, edita/reprograma un turno ajeno sin cambiar su cliente/catálogo/espacio, se asigna como responsable, cobra, comparte y revoca un comprobante con los datos comerciales originales, cancela y elimina. Recibe cambios de otro operador sin recargar y crea nuevos turnos con clientes nuevos. Agenda y detalle comprobados también a 360 px.
-- Prohibidas escrituras directas en pagos y cambios del negocio sin rol administrador.
+- Prohibidas escrituras directas en pagos y cambios del negocio sin sesión. Cualquier cuenta autenticada puede configurar el negocio; se conserva el control de versiones concurrentes.
 - Invitaciones y revocación de acceso sin borrar autoría.
 - Claves compuestas impiden referencias a clientes de otro espacio.
 - Teléfonos duplicados rechazados por índice único.

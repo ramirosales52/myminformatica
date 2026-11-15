@@ -704,7 +704,7 @@ describe('Supabase real: seguridad, dinero y sincronización', () => {
     expect(
       (await C.from('message_templates').select('*').eq('workspace_id', workspace)).data,
     ).toHaveLength(1)
-    expect((await C.rpc('create_invite', { p_workspace: workspace })).error).not.toBeNull()
+    expect((await C.rpc('create_invite', { p_workspace: workspace })).error).toBeNull()
     const anonymous = client()
     const denied = await anonymous.rpc('record_payment', {
       p_appointment: appointment,
@@ -782,15 +782,44 @@ describe('Supabase real: seguridad, dinero y sincronización', () => {
     const global = await rpc<ScheduledAppointment[]>(C, 'global_schedule', {})
     expect(global.some((a) => a.id === arsAppointment)).toBe(false)
   })
-  it('un integrante no puede crear invitaciones ni cambiar el negocio', async () => {
-    const r = await B.rpc('create_invite', { p_workspace: workspace })
-    expect(r.error).not.toBeNull()
-    const edit = await B.from('workspaces')
+  it('todos pueden configurar el negocio e invitar, sin roles ni membresías', async () => {
+    for (const operator of [B, D]) {
+      expect((await operator.rpc('create_invite', { p_workspace: workspace })).error).toBeNull()
+      const current = await operator
+        .from('workspaces')
+        .select('version')
+        .eq('id', workspace)
+        .single()
+      expect(current.error).toBeNull()
+      const edit = await operator
+        .from('workspaces')
+        .update({ business_name: 'Negocio compartido QA' })
+        .eq('id', workspace)
+        .eq('version', current.data!.version)
+        .select()
+        .single()
+      expect(edit.error).toBeNull()
+      expect(edit.data!.version).toBe(current.data!.version + 1)
+      const stale = await operator
+        .from('workspaces')
+        .update({ business_name: 'Edición obsoleta' })
+        .eq('id', workspace)
+        .eq('version', current.data!.version)
+        .select()
+      expect(stale.data).toHaveLength(0)
+    }
+  })
+  it('sin sesión no se puede cambiar el negocio ni crear invitaciones', async () => {
+    const anonymous = client()
+    expect((await anonymous.rpc('create_invite', { p_workspace: workspace })).error).not.toBeNull()
+    const denied = await anonymous
+      .from('workspaces')
       .update({ business_name: 'No autorizado' })
       .eq('id', workspace)
       .select()
-      .single()
-    expect(edit.error).not.toBeNull()
+    expect(denied.data ?? []).toHaveLength(0)
+    const current = await A.from('workspaces').select('business_name').eq('id', workspace).single()
+    expect(current.data?.business_name).toBe('Negocio compartido QA')
   })
   it('los ingresos de hoy incluyen cobros de un turno de mañana', async () => {
     const ps = await getPayments()
@@ -839,7 +868,7 @@ describe('Supabase real: seguridad, dinero y sincronización', () => {
     expect(r.data!.length).toBeGreaterThan(0)
     const templates = await B.from('message_templates').select('*').eq('workspace_id', workspace)
     expect(templates.data!.length).toBeGreaterThan(0)
-    expect((await B.rpc('create_invite', { p_workspace: workspace })).error).not.toBeNull()
+    expect((await B.rpc('create_invite', { p_workspace: workspace })).error).toBeNull()
     const history = await A.from('activity_log').select('*').eq('actor_id', users[1].id)
     expect(history.data!.length).toBeGreaterThan(0)
   })

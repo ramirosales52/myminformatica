@@ -110,7 +110,6 @@ export function Settings({ initialTab }: { initialTab?: 'workspace' | 'profile' 
                 />
                 <div className="team-members">
                   {data.profiles.map((p) => {
-                    const admin = data.members.some((m) => m.user_id === p.id && m.role === 'admin')
                     return (
                       <div className="team-member" key={p.id}>
                         <span className="avatar">{initials(p?.full_name ?? '')}</span>
@@ -119,7 +118,7 @@ export function Settings({ initialTab }: { initialTab?: 'workspace' | 'profile' 
                             {p?.full_name ?? 'Integrante'}
                             {p.id === session?.user.id ? ' (vos)' : ''}
                           </strong>
-                          <small>{admin ? 'Administrador' : 'Integrante'}</small>
+                          <small>Acceso completo</small>
                         </div>
                         <span className="team-badge">
                           <ShieldCheck size={15} />
@@ -139,8 +138,8 @@ export function Settings({ initialTab }: { initialTab?: 'workspace' | 'profile' 
                   <h3>Permisos</h3>
                   <p>
                     Todos los usuarios con sesión iniciada comparten clientes, servicios, turnos,
-                    cobros, reportes y mensajes. Solo los administradores cambian la configuración
-                    del negocio.
+                    cobros, reportes, mensajes y configuración del negocio. Todos tienen los mismos
+                    permisos.
                   </p>
                   <span className="live-label">
                     <span className={`tiny-dot ${sync === 'live' ? '' : 'gray'}`} />
@@ -176,7 +175,7 @@ export function Settings({ initialTab }: { initialTab?: 'workspace' | 'profile' 
   )
 }
 function BusinessSettings() {
-  const { workspace, isAdmin, refresh } = useData()
+  const { workspace, refresh } = useData()
   const notify = useToast()
   const [name, setName] = useState(workspace!.name)
   const [business, setBusiness] = useState(workspace!.business_name)
@@ -214,7 +213,7 @@ function BusinessSettings() {
   }
   return (
     <form onSubmit={save} className="form-stack">
-      <fieldset disabled={!isAdmin || busy}>
+      <fieldset disabled={busy}>
         <div className="form-grid">
           <Field label="Nombre del negocio">
             <input
@@ -262,12 +261,8 @@ function BusinessSettings() {
         </div>
       </fieldset>
       <div className="settings-save">
-        <span className="muted small">
-          {isAdmin
-            ? 'Los cambios se aplican a todo el equipo.'
-            : 'Solo administradores pueden cambiar estos datos.'}
-        </span>
-        <Button type="submit" disabled={!isAdmin} loading={busy}>
+        <span className="muted small">Los cambios se aplican a todo el equipo.</span>
+        <Button type="submit" loading={busy}>
           <Save size={16} />
           Guardar ajustes
         </Button>

@@ -32,7 +32,6 @@ interface DataContextValue {
   loading: boolean
   error: unknown
   sync: string
-  isAdmin: boolean
   refresh: () => Promise<void>
 }
 const DataContext = createContext<DataContextValue>({
@@ -45,7 +44,6 @@ const DataContext = createContext<DataContextValue>({
   loading: false,
   error: null,
   sync: 'unconfigured',
-  isAdmin: false,
   refresh: async () => {},
 })
 export const useData = () => useContext(DataContext)
@@ -240,7 +238,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
           (account.isPending || schedule.isPending || (Boolean(workspaceId) && shared.isPending)),
         error: account.error || shared.error || schedule.error,
         sync: !userId ? 'unconfigured' : !workspaceId && schedule.isSuccess ? 'polling' : sync,
-        isAdmin: data.members.some((m) => m.user_id === userId && m.role === 'admin'),
         refresh,
       }}
     >

@@ -34,7 +34,7 @@ export function messageFor(error: unknown): string {
     if (message.includes('Failed to fetch') || message.includes('NetworkError'))
       return 'No hay conexión con Supabase. Verificá Internet e intentá nuevamente.'
     if (message.includes('permission denied') || message.includes('row-level security'))
-      return 'No tenés permiso para esta operación. Consultá con un administrador.'
+      return 'No se pudo autorizar la operación. Volvé a iniciar sesión.'
     return message
   }
   return 'No se pudo completar la operación. Intentá nuevamente.'

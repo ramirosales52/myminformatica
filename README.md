@@ -23,7 +23,7 @@ Turnos con múltiples servicios, precio/duración personalizados, responsable, c
 
 **Clientes globales y teléfono opcional:** todos los usuarios autenticados ven la misma lista de clientes y pueden crearlos, editarlos y eliminarlos sin membresía. El teléfono se puede dejar vacío tanto al registrar un cliente como al agendar; varios clientes pueden no tener teléfono. WhatsApp solo se habilita con un número registrado; los comprobantes se pueden descargar sin teléfono. Eliminar un cliente lo quita de la lista y de nuevas selecciones, pero conserva sus turnos, cobros e historial. El catálogo compartido está disponible al agendar para cualquier cliente.
 
-**Negocio único compartido:** aplicá las migraciones pendientes, incluida `20261110210235_single_shared_business.sql`, antes de desplegar el frontend actualizado. Todas las cuentas registradas comparten clientes, servicios, turnos, pagos, reportes, historial y plantillas, sin crear ni elegir espacios. Los identificadores históricos se conservan sin mover ni borrar filas. Los nuevos registros usan el negocio más antiguo. Los administradores existentes mantienen la configuración del negocio; no se conceden roles nuevos. Las notificaciones personales no se comparten.
+**Negocio único compartido:** aplicá las migraciones pendientes, incluida `20261115050339_equal_permissions_for_all_users.sql`, antes de desplegar el frontend actualizado. Todas las cuentas registradas comparten clientes, servicios, turnos, pagos, reportes, historial y plantillas, sin crear ni elegir espacios. Los identificadores históricos se conservan sin mover ni borrar filas. Los nuevos registros usan el negocio más antiguo. Todas las cuentas autenticadas tienen acceso completo, incluida la configuración del negocio, sin diferencias de roles. Las notificaciones personales no se comparten.
 
 ## 1. Ejecutar con Supabase local
 
@@ -86,8 +86,8 @@ Alternativa: ejecutar los SQL en orden en el SQL Editor. No mezcles métodos sin
 
 1. Cada persona usa **Crear cuenta** y confirma su email si corresponde.
 2. Todas las cuentas acceden automáticamente al mismo negocio y ven todos sus datos operativos.
-3. En una instalación nueva, la primera cuenta inicializa el negocio y es administradora. En instalaciones existentes se conservan los roles administrativos.
-4. Solo administradores cambian la configuración desde **Ajustes → Negocio y equipo**. Quitar una membresía histórica no revoca el acceso global: para bloquear una cuenta hay que gestionar su acceso en Auth.
+3. Todas las cuentas tienen los mismos permisos; las etiquetas históricas `admin`/`member` ya no se usan para autorizar.
+4. Cualquier cuenta autenticada cambia la configuración desde **Ajustes → Negocio y equipo**. Quitar una membresía histórica no revoca el acceso global: para bloquear una cuenta hay que gestionar su acceso en Auth.
 5. Cada persona modifica nombre, teléfono y contraseña en **Mi perfil**. El nombre comercial del comprobante es independiente.
 
 No compartan contraseñas ni credenciales de administración de Supabase entre operadores.
