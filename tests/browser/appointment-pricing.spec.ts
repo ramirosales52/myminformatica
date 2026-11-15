@@ -1,4 +1,12 @@
 import { expect, test } from '@playwright/test'
+import type { Page } from '@playwright/test'
+
+async function selectService(page: Page, name: string, checked = true) {
+  const summary = page.locator('.service-dropdown > summary')
+  await summary.click()
+  await page.getByRole('checkbox', { name: new RegExp(name) }).setChecked(checked)
+  await summary.click()
+}
 
 // Real form with isolated providers: no account, remote writes or database required.
 test.beforeEach(async ({ page }) => {
@@ -93,22 +101,38 @@ test('conserva el cliente registrado al editar o agendar desde un cliente', asyn
   }
 })
 
+test('el desplegable permite seleccionar y deseleccionar con checkboxes', async ({ page }) => {
+  await page.goto('/__appointment-pricing')
+  const dropdown = page.locator('.service-dropdown')
+  await expect(dropdown).not.toHaveAttribute('open')
+  await dropdown.locator('summary').click()
+  await page.getByRole('checkbox', { name: /Limpieza/ }).check()
+  await page.getByRole('checkbox', { name: /Instalación/ }).check()
+  await expect(dropdown.getByRole('checkbox', { checked: true })).toHaveCount(2)
+  await expect(page.getByLabel('Precio total', { exact: true })).toHaveValue('30000')
+  await page.getByRole('checkbox', { name: /Limpieza/ }).uncheck()
+  await expect(dropdown.getByRole('checkbox', { checked: true })).toHaveCount(1)
+  await dropdown.locator('summary').click()
+  await expect(dropdown.locator('summary')).toHaveText('1 servicio seleccionado')
+  await expect(page.getByLabel('Precio total', { exact: true })).toHaveValue('20000')
+})
+
 test('combina servicios y conserva el precio personalizado al sumar o quitar otros', async ({
   page,
 }) => {
   await page.goto('/__appointment-pricing')
   const total = page.getByLabel('Precio total', { exact: true })
-  await page.getByRole('checkbox', { name: /Limpieza/ }).check()
-  await page.getByRole('checkbox', { name: /Instalación/ }).check()
+  await selectService(page, 'Limpieza')
+  await selectService(page, 'Instalación')
   await expect(total).toHaveValue('30000')
   await expect(page.getByLabel('Duración (minutos)', { exact: true })).toHaveValue('90')
   await total.fill('25000')
   await expect(page.getByText('Suma de servicios: ARS 30.000 · Descuento: ARS 5.000')).toBeVisible()
-  await page.getByRole('checkbox', { name: /Configuración/ }).check()
+  await selectService(page, 'Configuración')
   await expect(total).toHaveValue('25000')
-  await page.getByRole('checkbox', { name: /Instalación/ }).uncheck()
+  await selectService(page, 'Instalación', false)
   await expect(total).toHaveValue('25000')
-  await page.getByRole('checkbox', { name: /Instalación/ }).check()
+  await selectService(page, 'Instalación')
   await page.getByRole('button', { name: 'Agendar turno', exact: true }).click()
   const saved = await page.evaluate(
     () => (window as unknown as { saved: { p_payload: Record<string, unknown> } }).saved,
@@ -123,14 +147,14 @@ test('al editar conserva el descuento y permite volver al precio del catálogo',
   await page.goto('/__appointment-pricing?edit')
   const total = page.getByLabel('Precio total', { exact: true })
   await expect(total).toHaveValue('8000')
-  await page.getByRole('checkbox', { name: /Instalación/ }).check()
+  await selectService(page, 'Instalación')
   await expect(total).toHaveValue('8000')
   await page.getByRole('button', { name: 'Usar suma de servicios', exact: true }).click()
   await expect(total).toHaveValue('30000')
-  await page.getByRole('checkbox', { name: /Configuración/ }).check()
+  await selectService(page, 'Configuración')
   await expect(total).toHaveValue('35000')
   await total.fill('0')
-  await page.getByRole('checkbox', { name: /Configuración/ }).uncheck()
+  await selectService(page, 'Configuración', false)
   await expect(total).toHaveValue('0')
   await page.getByRole('button', { name: 'Guardar cambios', exact: true }).click()
   const saved = await page.evaluate(
@@ -144,7 +168,7 @@ test('cambiar moneda recalcula el catálogo sin reutilizar un importe en otra mo
   page,
 }) => {
   await page.goto('/__appointment-pricing')
-  await page.getByRole('checkbox', { name: /Limpieza/ }).check()
+  await selectService(page, 'Limpieza')
   await page.getByLabel('Precio total', { exact: true }).fill('8000')
   await page.getByLabel('Moneda', { exact: true }).selectOption('USD')
   await expect(page.getByLabel('Precio total', { exact: true })).toHaveValue('10')

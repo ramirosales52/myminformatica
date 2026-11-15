@@ -339,45 +339,44 @@ export function AppointmentForm({
           <h3>Servicios del turno</h3>
           <span className="muted ml-auto">Podés combinar varios</span>
         </div>
-        <p className="muted small">
-          Marcá todos los servicios que vas a realizar. Podés sumar otros editando este mismo turno.
-        </p>
-        <div className="service-picker">
-          {data.services
-            .filter((s) => (s.active && !s.deleted_at) || lines.some((l) => l.service_id === s.id))
-            .map((s) => (
-              <label
-                className={`service-option ${lines.some((l) => l.service_id === s.id) ? 'selected' : ''}`}
-                key={s.id}
-              >
-                <input
-                  type="checkbox"
-                  checked={lines.some((l) => l.service_id === s.id)}
-                  onChange={() => {
-                    setDirty(true)
-                    toggleService(s.id)
-                  }}
-                />
-                <span>
-                  <strong>{s.name}</strong>
-                  <small>
-                    {duration(s.duration_minutes)} ·{' '}
-                    {money(currency === 'ARS' ? s.price_ars : s.price_usd, currency)}
-                  </small>
-                </span>
-              </label>
-            ))}
-          {!data.services.some((s) => s.active && !s.deleted_at) && !lines.length ? (
-            <p className="muted">Primero registrá tus servicios en el catálogo.</p>
-          ) : null}
-        </div>
-        {lines.length ? (
-          <div className="inline-info" aria-live="polite">
-            {lines.length}{' '}
-            {lines.length === 1 ? 'servicio seleccionado' : 'servicios seleccionados'}
-            {' · '}
-            {lines.map((line) => line.name).join(' + ')}
+        <details className="service-dropdown">
+          <summary>
+            {lines.length
+              ? `${lines.length} ${lines.length === 1 ? 'servicio seleccionado' : 'servicios seleccionados'}`
+              : 'Seleccionar servicios'}
+          </summary>
+          <div className="service-dropdown-options" role="group" aria-label="Servicios del turno">
+            {data.services
+              .filter(
+                (s) => (s.active && !s.deleted_at) || lines.some((l) => l.service_id === s.id),
+              )
+              .map((s) => {
+                const selected = lines.some((line) => line.service_id === s.id)
+                return (
+                  <label
+                    className={`service-dropdown-option ${selected ? 'selected' : ''}`}
+                    key={s.id}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      onChange={() => {
+                        setDirty(true)
+                        toggleService(s.id)
+                      }}
+                    />
+                    <span>{s.name}</span>
+                    <small>
+                      {duration(s.duration_minutes)} ·{' '}
+                      {money(currency === 'ARS' ? s.price_ars : s.price_usd, currency)}
+                    </small>
+                  </label>
+                )
+              })}
           </div>
+        </details>
+        {!data.services.some((s) => s.active && !s.deleted_at) && !lines.length ? (
+          <p className="muted">Primero registrá tus servicios en el catálogo.</p>
         ) : null}
         <div className="form-section-title">
           <CalendarDays size={17} />
