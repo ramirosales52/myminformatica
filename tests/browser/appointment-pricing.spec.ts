@@ -64,11 +64,33 @@ test.beforeEach(async ({ page }) => {
         };
         const { AppointmentForm } = await import('/src/components/AppointmentForm.tsx');
         ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(AppointmentForm, {
-          appointment, initialCustomer: 'customer', onClose: () => { window.formClosed = true; }
+          appointment, initialCustomer: location.search.includes('new-customer') ? undefined : 'customer',
+          onClose: () => { window.formClosed = true; }
         }));
       </script></body></html>`,
     }),
   )
+})
+
+test('un turno nuevo abre con cliente nuevo y permite seleccionar uno registrado', async ({
+  page,
+}) => {
+  await page.goto('/__appointment-pricing?new-customer')
+  await expect(page.getByLabel('Nombre y apellido', { exact: true })).toBeVisible()
+  await expect(page.getByLabel('WhatsApp (opcional)', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Seleccionar registrado', exact: true }).click()
+  await expect(page.getByLabel('Nombre y apellido', { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Nuevo cliente', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Nuevo cliente', exact: true }).click()
+  await expect(page.getByLabel('Nombre y apellido', { exact: true })).toBeVisible()
+})
+
+test('conserva el cliente registrado al editar o agendar desde un cliente', async ({ page }) => {
+  for (const query of ['', '?edit']) {
+    await page.goto(`/__appointment-pricing${query}`)
+    await expect(page.getByLabel('Nombre y apellido', { exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Nuevo cliente', exact: true })).toBeVisible()
+  }
 })
 
 test('combina servicios y conserva el precio personalizado al sumar o quitar otros', async ({

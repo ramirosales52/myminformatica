@@ -116,7 +116,7 @@ function WorkspaceApp() {
   const [page, setPage] = useState<Page>(initialPage)
   const [agendaState, setAgendaState] = useState<AgendaState>(() => ({
     day: today(),
-    view: 'week',
+    view: 'day',
     search: '',
     status: 'all',
     service: 'all',

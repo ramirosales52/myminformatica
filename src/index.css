@@ -5704,9 +5704,9 @@ tbody > tr:hover {
 }
 .timeline-hour > time {
   padding-top: 14px;
-  color: #edf2fc;
-  font-size: 13px;
-  font-weight: 700;
+  color: #8e9bb3;
+  font-size: 11px;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 .timeline-hour.is-current-hour > time {
@@ -5907,7 +5907,7 @@ tbody > tr:hover {
     grid-template-columns: 52px minmax(0, 1fr);
   }
   .timeline-hour > time {
-    font-size: 12px;
+    font-size: 11px;
   }
   .timeline-now > time {
     font-size: 10px;
@@ -5984,6 +5984,8 @@ tbody > tr:hover {
 }
 .day-timeline .appointment-card .appointment-time strong {
   font-size: 14px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .day-timeline .appointment-card .appointment-main {
   flex: 1;

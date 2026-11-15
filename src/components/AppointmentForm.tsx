@@ -45,7 +45,7 @@ export function AppointmentForm({
   const data = appointmentData
   const { session } = useAuth()
   const notify = useToast()
-  const [newCustomer, setNewCustomer] = useState(false)
+  const [newCustomer, setNewCustomer] = useState(!appointment && !initialCustomer)
   const [offsetEdits, setOffsetEdits] = useState<Record<string, string>>({})
   const offsetKey = newCustomer ? 'new' : customerId
   const selectedCustomer = data.customers.find((c) => c.id === customerId)

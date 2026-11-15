@@ -57,7 +57,7 @@ export function Agenda({
   const { session } = useAuth()
   const [localState, setLocalState] = useState<AgendaState>(() => ({
     day: initialDay ?? today(),
-    view: 'week',
+    view: 'day',
     search: '',
     status: 'all',
     service: 'all',
