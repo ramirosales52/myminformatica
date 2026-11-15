@@ -6245,6 +6245,96 @@ tbody > tr:hover {
   margin: 0;
   accent-color: #58d6aa;
 }
+/* Densidad del formulario de turnos, sin alterar los demás diálogos. */
+.modal:has(> .appointment-form) {
+  max-width: 720px;
+  padding: 18px 20px;
+}
+.modal:has(> .appointment-form) .modal-heading {
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+}
+.modal:has(> .appointment-form) .modal-heading h2 {
+  font-size: 20px;
+}
+.appointment-form .form-section-title {
+  gap: 7px;
+  margin: 14px 0 8px;
+}
+.appointment-form .form-section-title:first-child {
+  margin-top: 0;
+}
+.appointment-form .form-grid {
+  gap: 10px 12px;
+}
+.appointment-form > .form-grid,
+.appointment-form > .field {
+  margin-top: 8px;
+}
+.appointment-form .field {
+  gap: 4px;
+}
+.appointment-form .field input,
+.appointment-form .field select,
+.appointment-form .field textarea,
+.appointment-form .customer-picker > input {
+  min-height: 38px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+.appointment-form .field > small {
+  line-height: 1.5;
+}
+.appointment-form .inline-info {
+  padding: 6px 0;
+  line-height: 1.5;
+  flex-wrap: wrap;
+}
+.appointment-form .form-disclosure {
+  margin: 8px 0;
+  padding-inline: 10px;
+}
+.appointment-form .form-disclosure > summary {
+  padding: 8px 0;
+  min-height: 36px;
+  font-size: 12px;
+}
+.appointment-form .form-disclosure[open] {
+  padding-bottom: 10px;
+}
+.appointment-form .service-dropdown {
+  margin-bottom: 6px;
+}
+.appointment-form .service-dropdown > summary {
+  min-height: 38px;
+  padding: 9px 10px;
+}
+.appointment-form .initial-payment {
+  margin-top: 10px;
+  padding: 10px;
+  gap: 10px;
+}
+.appointment-form .initial-payment > .segmented {
+  margin-top: 22px;
+}
+.appointment-form .customer-picker {
+  margin-bottom: 8px;
+}
+.appointment-form > .modal-actions {
+  margin-top: 12px;
+  padding-top: 12px;
+}
+@media (max-width: 760px) {
+  .modal:has(> .appointment-form) {
+    padding: 14px;
+  }
+  .appointment-form .field input,
+  .appointment-form .field select,
+  .appointment-form .customer-picker > input,
+  .appointment-form .service-dropdown > summary {
+    min-height: 44px;
+  }
+}
 .customer-picker {
   position: relative;
   margin-bottom: 16px;

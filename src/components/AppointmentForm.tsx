@@ -307,7 +307,7 @@ export function AppointmentForm({
                 placeholder="Nombre del cliente"
               />
             </Field>
-            <Field label="WhatsApp (opcional)" hint="Número completo con código de país.">
+            <Field label="WhatsApp (opcional)">
               <input
                 type="tel"
                 autoComplete="tel"
@@ -337,7 +337,6 @@ export function AppointmentForm({
         <div className="form-section-title">
           <Check size={17} />
           <h3>Servicios del turno</h3>
-          <span className="muted ml-auto">Podés combinar varios</span>
         </div>
         <details className="service-dropdown">
           <summary>
@@ -360,7 +359,11 @@ export function AppointmentForm({
                     <input
                       type="checkbox"
                       checked={selected}
-                      onChange={() => {
+                      onChange={(e) => {
+                        if (e.currentTarget.checked && lines.length === 0) {
+                          const dropdown = e.currentTarget.closest('details')
+                          if (dropdown) dropdown.open = false
+                        }
                         setDirty(true)
                         toggleService(s.id)
                       }}
@@ -389,23 +392,12 @@ export function AppointmentForm({
           </Field>
           <Field label="Hora de inicio (24 h)">
             <input
-              type="text"
-              inputMode="numeric"
+              type="time"
               required
-              pattern="([01][0-9]|2[0-3]):[0-5][0-9]"
-              title="Usá el formato de 24 horas: HH:mm"
-              maxLength={5}
-              list="appointment-times"
+              step={60}
               value={time}
               onChange={(e) => setTime(e.target.value)}
-              placeholder="14:30"
             />
-            <datalist id="appointment-times">
-              {Array.from({ length: 96 }, (_, i) => {
-                const value = `${String(Math.floor(i / 4)).padStart(2, '0')}:${String((i % 4) * 15).padStart(2, '0')}`
-                return <option value={value} key={value} />
-              })}
-            </datalist>
           </Field>
           <Field label="Duración (minutos)">
             <input
@@ -431,48 +423,41 @@ export function AppointmentForm({
               : ' Elegí otro horario o habilitá superposiciones en Ajustes.'}
           </div>
         ) : null}
-        <details className="form-disclosure">
-          <summary>
-            Más opciones · {STATUS[status]} ·{' '}
-            {data.profiles.find((p) => p.id === responsible)?.full_name ?? 'Responsable'}
-            {offset ? ` · Hora del cliente: ${offset} h` : ''}
-          </summary>
-          <Field
-            label="Diferencia de hora con Argentina"
-            hint="En horas: −2 si está dos horas atrás, +4 si está cuatro horas adelante. Vacío o 0 usa la hora argentina. Se recuerda para los comprobantes de este cliente."
-          >
-            <input
-              type="text"
-              inputMode="decimal"
-              value={offset}
-              onChange={(e) =>
-                setOffsetEdits((values) => ({ ...values, [offsetKey]: e.target.value }))
-              }
-              placeholder="0"
-            />
+        <div className="form-grid">
+          <Field label="Estado">
+            <select value={status} onChange={(e) => setStatus(e.target.value as Status)}>
+              {Object.entries(STATUS).map(([v, text]) => (
+                <option value={v} key={v}>
+                  {text}
+                </option>
+              ))}
+            </select>
           </Field>
-          <div className="form-grid">
-            <Field label="Estado">
-              <select value={status} onChange={(e) => setStatus(e.target.value as Status)}>
-                {Object.entries(STATUS).map(([v, text]) => (
-                  <option value={v} key={v}>
-                    {text}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Responsable">
-              <select required value={responsible} onChange={(e) => setResponsible(e.target.value)}>
-                <option value="">Seleccionar integrante…</option>
-                {data.profiles.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.full_name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          </div>
-        </details>
+          <Field label="Responsable">
+            <select required value={responsible} onChange={(e) => setResponsible(e.target.value)}>
+              <option value="">Seleccionar integrante…</option>
+              {data.profiles.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.full_name}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+        <Field
+          label="Diferencia de hora con Argentina"
+          hint="Ej.: −2 h atrás, +4 h adelante. 0 = Argentina."
+        >
+          <input
+            type="text"
+            inputMode="decimal"
+            value={offset}
+            onChange={(e) =>
+              setOffsetEdits((values) => ({ ...values, [offsetKey]: e.target.value }))
+            }
+            placeholder="0"
+          />
+        </Field>
         <div className="form-section-title">
           <Wallet size={17} />
           <h3>Importe acordado</h3>
@@ -484,7 +469,7 @@ export function AppointmentForm({
         </div>
         {customAmount !== null ? (
           <div className="inline-info">
-            Precio personalizado: se mantiene aunque agregues o quites servicios.
+            Precio personalizado
             <button
               type="button"
               className="text-link"
@@ -504,10 +489,7 @@ export function AppointmentForm({
               <option value="USD">Dólares (USD)</option>
             </select>
           </Field>
-          <Field
-            label="Precio total"
-            hint="Importe final por todos los servicios. Podés editarlo para aplicar un descuento o acordar otro precio."
-          >
+          <Field label="Precio total">
             <input
               inputMode="decimal"
               type="number"
@@ -533,7 +515,7 @@ export function AppointmentForm({
           <div className="initial-payment">
             <Field
               label="Cobro recibido ahora"
-              hint="Solo ingresá dinero que ya recibiste. Se registra junto con el turno."
+              hint="Solo dinero ya recibido."
             >
               <input
                 type="number"
@@ -556,11 +538,7 @@ export function AppointmentForm({
               </button>
             </div>
           </div>
-        ) : (
-          <div className="inline-info">
-            Los cobros y devoluciones se administran desde el detalle del turno.
-          </div>
-        )}
+        ) : null}
         <details className="form-disclosure" open={Boolean(appointment?.notes) || undefined}>
           <summary>Notas adicionales{notes ? ' · Con notas' : ''}</summary>
           <Field label="Notas adicionales">

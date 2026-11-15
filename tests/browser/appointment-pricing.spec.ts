@@ -5,7 +5,9 @@ async function selectService(page: Page, name: string, checked = true) {
   const summary = page.locator('.service-dropdown > summary')
   await summary.click()
   await page.getByRole('checkbox', { name: new RegExp(name) }).setChecked(checked)
-  await summary.click()
+  if ((await page.locator('.service-dropdown').getAttribute('open')) !== null) {
+    await summary.click()
+  }
 }
 
 // Real form with isolated providers: no account, remote writes or database required.
@@ -101,16 +103,64 @@ test('conserva el cliente registrado al editar o agendar desde un cliente', asyn
   }
 })
 
+test('el formulario compacto se adapta a escritorio y móvil sin desbordar', async ({ page }) => {
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto('/__appointment-pricing?new-customer')
+    const modal = page.getByRole('dialog')
+    const dimensions = await modal.evaluate((element) => ({
+      scroll: element.scrollWidth,
+      client: element.clientWidth,
+      width: element.getBoundingClientRect().width,
+    }))
+    expect(dimensions.scroll).toBeLessThanOrEqual(dimensions.client)
+    expect(dimensions.width).toBeLessThanOrEqual(Math.min(width, 720))
+    const input = await page.getByLabel('Nombre y apellido', { exact: true }).boundingBox()
+    expect(input?.height).toBeGreaterThanOrEqual(width === 390 ? 44 : 38)
+    await page.getByRole('button', { name: 'Agendar turno', exact: true }).scrollIntoViewIfNeeded()
+    await expect(page.getByRole('button', { name: 'Agendar turno', exact: true })).toBeInViewport()
+  }
+})
+
+test('las opciones están visibles y la hora usa un selector horario', async ({ page }) => {
+  await page.goto('/__appointment-pricing')
+  await expect(page.getByLabel('Estado', { exact: true })).toBeVisible()
+  await expect(page.getByLabel('Responsable', { exact: true })).toBeVisible()
+  await expect(page.getByLabel('Diferencia de hora con Argentina', { exact: true })).toBeVisible()
+  const time = page.getByLabel('Hora de inicio (24 h)', { exact: true })
+  await expect(time).toHaveAttribute('type', 'time')
+  await time.fill('14:30')
+  await expect(time).toHaveValue('14:30')
+  await expect(page.getByText('14:30 a 15:30 · 1 h', { exact: true })).toBeVisible()
+  await page.getByLabel('Fecha', { exact: true }).fill('2030-01-01')
+  await selectService(page, 'Instalación')
+  await page.getByRole('button', { name: 'Agendar turno', exact: true }).click()
+  const saved = await page.evaluate(
+    () => (window as unknown as { saved: { p_payload: Record<string, unknown> } }).saved,
+  )
+  expect(new Date(saved.p_payload.starts_at as string).toISOString()).toBe(
+    '2030-01-01T17:30:00.000Z',
+  )
+})
+
 test('el desplegable permite seleccionar y deseleccionar con checkboxes', async ({ page }) => {
   await page.goto('/__appointment-pricing')
   const dropdown = page.locator('.service-dropdown')
   await expect(dropdown).not.toHaveAttribute('open')
   await dropdown.locator('summary').click()
   await page.getByRole('checkbox', { name: /Limpieza/ }).check()
+  await expect(dropdown).not.toHaveAttribute('open')
+  await dropdown.locator('summary').click()
   await page.getByRole('checkbox', { name: /Instalación/ }).check()
+  await expect(dropdown).toHaveAttribute('open')
   await expect(dropdown.getByRole('checkbox', { checked: true })).toHaveCount(2)
   await expect(page.getByLabel('Precio total', { exact: true })).toHaveValue('30000')
+  await page.getByRole('checkbox', { name: /Configuración/ }).check()
+  await expect(dropdown).toHaveAttribute('open')
+  await page.getByRole('checkbox', { name: /Configuración/ }).uncheck()
+  await expect(dropdown).toHaveAttribute('open')
   await page.getByRole('checkbox', { name: /Limpieza/ }).uncheck()
+  await expect(dropdown).toHaveAttribute('open')
   await expect(dropdown.getByRole('checkbox', { checked: true })).toHaveCount(1)
   await dropdown.locator('summary').click()
   await expect(dropdown.locator('summary')).toHaveText('1 servicio seleccionado')
