@@ -72,7 +72,8 @@ type Overlay =
       day?: string
     }
   | { kind: 'details'; id: string }
-  | { kind: 'payment' | 'receipt' | 'reschedule' | 'message'; appointment: Appointment }
+  | { kind: 'receipt'; id: string }
+  | { kind: 'payment' | 'reschedule' | 'message'; appointment: Appointment }
   | { kind: 'customer'; customer?: Customer }
   | { kind: 'customerDetails'; customer: Customer }
   | null
@@ -219,6 +220,7 @@ function WorkspaceApp() {
         customerId: appointment.customer_id,
       })
     else if (action === 'edit') setOverlay({ kind: 'appointment', appointment })
+    else if (action === 'receipt') setOverlay({ kind: 'receipt', id: appointment.id })
     else setOverlay({ kind: action, appointment })
   }
   async function signOut() {
@@ -274,6 +276,10 @@ function WorkspaceApp() {
         .slice(0, 2)
     : []
   const closeOverlay = () => setOverlay(null)
+  const receiptAppointment =
+    overlay?.kind === 'receipt'
+      ? appointmentData.appointments.find((a) => a.id === overlay.id)
+      : undefined
   const memberName = profile?.full_name ?? 'Tu perfil'
   return (
     <div className="app-shell">
@@ -688,6 +694,7 @@ function WorkspaceApp() {
             initialDay={overlay.day}
             repeatFrom={overlay.repeatFrom}
             onClose={closeOverlay}
+            onSaved={overlay.appointment ? undefined : (id) => setOverlay({ kind: 'receipt', id })}
           />
         ) : overlay?.kind === 'details' ? (
           <AppointmentDetails
@@ -695,7 +702,7 @@ function WorkspaceApp() {
             onClose={closeOverlay}
             onEdit={(appointment) => setOverlay({ kind: 'appointment', appointment })}
             onPayment={(appointment) => setOverlay({ kind: 'payment', appointment })}
-            onReceipt={(appointment) => setOverlay({ kind: 'receipt', appointment })}
+            onReceipt={(appointment) => setOverlay({ kind: 'receipt', id: appointment.id })}
           />
         ) : overlay?.kind === 'reschedule' ? (
           <RescheduleForm appointment={overlay.appointment} onClose={closeOverlay} />
@@ -715,14 +722,8 @@ function WorkspaceApp() {
             }
             onClose={closeOverlay}
           />
-        ) : overlay?.kind === 'receipt' ? (
-          <Receipt
-            appointment={
-              appointmentData.appointments.find((a) => a.id === overlay.appointment.id) ??
-              overlay.appointment
-            }
-            onClose={closeOverlay}
-          />
+        ) : overlay?.kind === 'receipt' && receiptAppointment ? (
+          <Receipt appointment={receiptAppointment} onClose={closeOverlay} />
         ) : overlay?.kind === 'customer' ? (
           <CustomerForm customer={overlay.customer} onClose={closeOverlay} />
         ) : overlay?.kind === 'customerDetails' ? (

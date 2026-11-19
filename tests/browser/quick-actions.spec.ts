@@ -32,7 +32,17 @@ test.beforeEach(async ({ page }) => {
         window.calls.push({name, args});
         if (window.fail) throw Error('Saldo actualizado por otro integrante');
         if (name === 'record_payment') window.fixture.appointmentData.payments.push({appointment_id:'a',amount_cents:args.p_amount,kind:'charge',currency:'ARS',paid_at:args.p_paid_at});
-        if (name === 'save_appointment') Object.assign(window.fixture.appointmentData.appointments[0], args.p_payload);
+        if (name === 'save_appointment') {
+          if (args.p_id) Object.assign(window.fixture.appointmentData.appointments[0], args.p_payload);
+          else {
+            const data = window.fixture.appointmentData;
+            const id = 'new-appointment';
+            data.appointments.push({...data.appointments[0], ...args.p_payload, id, reference:'T-NEW', version:1});
+            data.appointmentServices.push(...args.p_payload.services.map(s => ({...s, appointment_id:id})));
+            if (args.p_payload.initial_payment) data.payments.push({...args.p_payload.initial_payment, appointment_id:id, kind:'charge'});
+            return id;
+          }
+        }
         return 'a';
       };`,
     }),
@@ -86,6 +96,27 @@ test.beforeEach(async ({ page }) => {
     </script></body></html>`,
     }),
   )
+})
+
+test('agendar abre directamente el comprobante del nuevo turno con su cobro', async ({ page }) => {
+  await page.goto('/__quick-agenda?mode=app')
+  await page.getByRole('button', { name: 'Nuevo turno', exact: true }).first().click()
+  await page.getByRole('button', { name: 'Seleccionar registrado', exact: true }).click()
+  await page.getByRole('combobox', { name: 'Cliente registrado' }).fill('Ana')
+  await page.getByRole('option', { name: /Ana Pérez/ }).click()
+  await page.locator('.service-dropdown > summary').click()
+  await page.getByRole('checkbox', { name: /Mantenimiento/ }).check()
+  await page.getByLabel('Cobro recibido ahora', { exact: true }).fill('5000')
+  await page.getByRole('button', { name: 'Agendar turno', exact: true }).click()
+  const receipt = page.getByRole('dialog', { name: 'Comprobante del turno' })
+  await expect(receipt).toBeVisible()
+  await expect(receipt.locator('.receipt-reference')).toContainText('T-NEW')
+  await expect(receipt.locator('.receipt-customer')).toContainText('Ana Pérez')
+  await expect(receipt.locator('.receipt-services')).toContainText('Mantenimiento')
+  await expect(receipt.locator('.payment-pill')).toHaveText('Pago parcial')
+  await expect(receipt.getByRole('button', { name: 'Copiar imagen', exact: true })).toBeEnabled()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog')).toHaveCount(0)
 })
 
 test('día destaca las horas y mueve la línea de ahora sin recargar', async ({ page }) => {

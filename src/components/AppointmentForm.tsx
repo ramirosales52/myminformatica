@@ -254,8 +254,8 @@ export function AppointmentForm({
             ? 'Turno y cobro guardados.'
             : 'Turno agendado.',
       )
-      onSaved?.(id)
-      onClose()
+      if (onSaved) onSaved(id)
+      else onClose()
     } catch (err) {
       setError(messageFor(err))
     } finally {
